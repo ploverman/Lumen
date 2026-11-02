@@ -25,6 +25,7 @@ namespace Lumen.Connectors
             {
                 case "Product": return Product();
                 case "Date": return Dates();
+                case "Locations": return WarehouseSample.Locations();
                 default: return Sales(salesRows);
             }
         }

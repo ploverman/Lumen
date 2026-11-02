@@ -247,6 +247,7 @@ namespace Lumen.Desktop
             gi("JSON", () => ImportFile("json", "JSON|*.json"));
             gi("SQL Server", ImportSql);
             gi("Sample report", LoadSample);
+            gi("Warehouse sample", LoadWarehouseSample);
             data.Items.Add(get);
             Rb(data, "Transform", "", () => TransformTable(null));
             Rb(data, "Refresh", "", RefreshData);
@@ -480,6 +481,16 @@ namespace Lumen.Desktop
             if (!ConfirmDiscard()) return;
             Dictionary<string, TableData> tables;
             var doc = SampleReport.Build(out tables);
+            _s.Replace(doc, tables, null);
+            AfterLoad();
+        }
+
+        /// <summary>Loads the warehouse sample, which shows the 3D visual.</summary>
+        private void LoadWarehouseSample()
+        {
+            if (!ConfirmDiscard()) return;
+            Dictionary<string, TableData> tables;
+            var doc = WarehouseReport.Build(out tables);
             _s.Replace(doc, tables, null);
             AfterLoad();
         }
@@ -836,6 +847,155 @@ namespace Lumen.Desktop
 
         // ---------------------------------------------------------- self-check
 
+        /// <summary>Drives the warehouse visual through its views, colors, picking, selection and slicers, writes PNGs and a log, saves the report beside them, then exits.</summary>
+        public async void RunWarehouseCheck(string outPath)
+        {
+            var log = new List<string>();
+            string full = Path.GetFullPath(outPath);
+            string stem = Path.Combine(Path.GetDirectoryName(full), Path.GetFileNameWithoutExtension(full));
+            int failures = 0;
+            Action<bool, string> check = (ok, what) => { log.Add((ok ? "PASS " : "FAIL ") + what); if (!ok) failures++; };
+            Func<string, Task> snap = async name =>
+            {
+                await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+                await Task.Delay(250);
+                var root = (FrameworkElement)Content;
+                var bmp = new RenderTargetBitmap((int)root.ActualWidth, (int)root.ActualHeight, 96, 96, PixelFormats.Pbgra32);
+                bmp.Render(root);
+                File.WriteAllBytes(stem + "-" + name + ".png", Exporter.Png(bmp));
+            };
+            try
+            {
+                Width = 1600; Height = 1000;
+                Show();
+                Dictionary<string, TableData> tables;
+                var doc = WarehouseReport.Build(out tables);
+                _s.Replace(doc, tables, null);
+                AfterLoad();
+                await ShowPageAndWait(doc.Pages[0].Id);
+                var page = doc.Pages[0];
+                var def = page.Visuals.First(v => v.Type == "warehouse3d");
+                var card = page.Visuals.First(v => v.Type == "card");
+                var c = FindContainer(def.Id);
+                var wh = (WarehouseVisual)c.Visual;
+                Func<Task> settle = async () =>
+                {
+                    while (wh.Flying) await Task.Delay(30);
+                    await Task.Delay(400);
+                };
+                Func<string> firstCard = () => FindContainer(card.Id).LastResults?.FirstOrDefault()?.Measure(0, 0).ToDisplayString();
+                foreach (var v in page.Visuals)
+                {
+                    var failed = FindContainer(v.Id).LastResults?.FirstOrDefault(r => r.Error != null);
+                    check(failed == null, v.Type + " queried" + (failed == null ? "" : ": " + failed.Error));
+                }
+                check(wh.Layout != null && wh.Layout.Locations.Count == 14000, "14,000 locations laid out, got " + wh.Layout?.Locations.Count);
+                check(wh.Layout != null && wh.Layout.BayRows.Count == 250, "250 bay rows, got " + wh.Layout?.BayRows.Count);
+                await snap("overview");
+
+                var timer = Stopwatch.StartNew();
+                foreach (var mode in new[] { WarehouseColor.StockAge, WarehouseColor.OpenSlots, WarehouseColor.FillRate }) wh.SetColor(mode);
+                log.Add("Three recolors took " + timer.ElapsedMilliseconds + " ms");
+                wh.SetColor(WarehouseColor.OpenSlots);
+                await snap("overview-open");
+
+                wh.SetView(WarehouseView.Plan);
+                await settle();
+                await snap("plan-open");
+                wh.SetColor(WarehouseColor.StockAge);
+                wh.SetView(WarehouseView.Aisle);
+                await settle();
+                await snap("aisle-age");
+                wh.SetColor(WarehouseColor.FillRate);
+                await snap("aisle-fill");
+
+                // A real ray through the plan finds a location, which then pins and cross-filters.
+                wh.SetView(WarehouseView.Plan);
+                await settle();
+                WarehouseLocation hit = null;
+                WarehouseBayRow tile;
+                wh.PickAt(new Point(wh.ViewSize.Width * 0.3, wh.ViewSize.Height * 0.3), out hit, out tile);
+                check(hit != null, "A ray pick finds a location in the plan: " + hit?.Id);
+                string before = firstCard();
+                wh.SelectLocation(hit, false);
+                await Task.Delay(500);
+                check(wh.Pinned == hit.Id, "The callout is pinned on the location");
+                check(firstCard() == "1", "Selecting a location cross-filters the card to 1, got " + firstCard() + " from " + before);
+                check(wh.Layout.Locations.Count(l => l.Visible) == 14000, "The 3D visual keeps every location while its own selection filters the page");
+                wh.SetView(WarehouseView.Aisle);
+                await settle();
+                await snap("aisle-pinned");
+                ((IVisualHost)c).ClearSelection();
+                await Task.Delay(300);
+                check(wh.Pinned == null, "Clearing the selection closes the callout");
+
+                var zone = page.Visuals.First(v => v.Type == "slicer");
+                wh.SetView(WarehouseView.Plan);
+                await settle();
+                ((IVisualHost)FindContainer(zone.Id)).SetSlicerFilter(FilterDef.Basic(zone.Role("field")[0], new object[] { "Zone A" }));
+                await Task.Delay(500);
+                await settle();
+                check(wh.Layout.Locations.Count(l => l.Visible) == 3360, "Slicing to Zone A keeps 3,360 locations, got " + wh.Layout.Locations.Count(l => l.Visible));
+                await snap("plan-zone-a");
+                wh.SetView(WarehouseView.Overview);
+                await settle();
+                await snap("overview-zone-a");
+                ((IVisualHost)FindContainer(zone.Id)).SetSlicerFilter(null);
+                await Task.Delay(500);
+                await settle();
+                check(wh.Layout.Locations.Count(l => l.Visible) == 14000, "Clearing the slicer restores 14,000 locations");
+
+                // A filter on one level leaves it at its height, because the plan comes from the unfiltered rows.
+                var level = page.Visuals.Where(v => v.Type == "slicer").ElementAt(2);
+                double topBefore = wh.Layout.Find("A-01-01-60-1").Slot.Y;
+                ((IVisualHost)FindContainer(level.Id)).SetSlicerFilter(FilterDef.Basic(level.Role("field")[0], new object[] { 60L }));
+                await Task.Delay(500);
+                await settle();
+                check(wh.Layout.Locations.Count(l => l.Visible) == 2000, "Slicing to level 60 keeps 2,000 locations, got " + wh.Layout.Locations.Count(l => l.Visible));
+                check(wh.Layout.Find("A-01-01-60-1").Slot.Y == topBefore, "Level 60 stays at its height");
+                await snap("level-60");
+                ((IVisualHost)FindContainer(level.Id)).SetSlicerFilter(null);
+                await Task.Delay(500);
+                await settle();
+
+                // Frame rate while the whole scene moves. The Rendering event fires once per composed frame.
+                int frames = 0;
+                EventHandler count = (s, e) => frames++;
+                CompositionTarget.Rendering += count;
+                var flight = Stopwatch.StartNew();
+                wh.SetView(WarehouseView.Plan);
+                await Task.Delay(50);
+                while (wh.Flying) await Task.Delay(10);
+                double flew = flight.Elapsed.TotalSeconds;
+                CompositionTarget.Rendering -= count;
+                log.Add($"Camera flight: {frames / flew:0} frames per second over {flew:0.0} s, render tier {RenderCapability.Tier >> 16}");
+                wh.SetView(WarehouseView.Overview);
+                await settle();
+
+                await WarehouseMouseCheck(wh, c, check, log);
+
+                SetTheme("Dark");
+                await Task.Delay(500);
+                await snap("overview-dark");
+                SetTheme("Light");
+                await Task.Delay(300);
+
+                LumenFile.Save(full, _s.Doc, _s.Tables, null);
+                check(File.Exists(full), "Saved " + full);
+                failures += App.Failures.Count;
+                log.AddRange(App.Failures);
+            }
+            catch (Exception ex)
+            {
+                failures++;
+                log.Add("FAIL " + ex);
+            }
+            log.Add(failures == 0 ? "All checks passed" : failures + " checks failed");
+            File.WriteAllLines(stem + ".log", log);
+            Environment.ExitCode = failures == 0 ? 0 : 1;
+            Application.Current.Shutdown();
+        }
+
         /// <summary>Drives the real shell end to end, writes PNGs and a log, then exits. Used to verify a build.</summary>
         public async void RunScreenshot(string outPath)
         {
@@ -1135,6 +1295,83 @@ namespace Lumen.Desktop
         /// <summary>A point in an element, in screen pixels.</summary>
         private static Point Center(FrameworkElement e, double fx = 0.5, double fy = 0.5) =>
             e.PointToScreen(new Point(e.ActualWidth * fx, e.ActualHeight * fy));
+
+        /// <summary>Drives the warehouse visual with the real cursor: hover, orbit, pan, wheel, click and the context menu. Skipped if someone is using the machine.</summary>
+        private async Task WarehouseMouseCheck(WarehouseVisual wh, VisualContainer c, Action<bool, string> check, List<string> log)
+        {
+            var li = new LastInput { Size = 8 };
+            GetLastInputInfo(ref li);
+            double idle = unchecked((uint)Environment.TickCount - li.Tick) / 1000.0;
+            if (idle < 30) { log.Add($"Real mouse check SKIPPED: last input {idle:0} s ago"); return; }
+
+            NativePoint home;
+            GetCursorPos(out home);
+            Topmost = true;
+            Activate();
+            await Task.Delay(300);
+            try
+            {
+                var view = (FrameworkElement)wh.ViewElement;
+                Point middle = Center(view), right = Center(view, 0.7, 0.55), plan = Center(view, 0.3, 0.3);
+
+                var before = wh.Camera;
+                await Task.Run(() => RealDrag(middle, right));
+                check(Math.Abs(wh.Camera.Yaw - before.Yaw) > 0.1, "A left drag orbits");
+                check(wh.Pinned == null, "A left drag does not select");
+
+                before = wh.Camera;
+                await Task.Run(() =>
+                {
+                    SetCursorPos((int)middle.X, (int)middle.Y);
+                    Thread.Sleep(120);
+                    mouse_event(8, 0, 0, 0, IntPtr.Zero);
+                    Thread.Sleep(120);
+                    for (int i = 1; i <= 16; i++) { SetCursorPos((int)middle.X + i * 6, (int)middle.Y); Thread.Sleep(30); }
+                    Thread.Sleep(100);
+                    mouse_event(16, 0, 0, 0, IntPtr.Zero);
+                    Thread.Sleep(400);
+                });
+                check((wh.Camera.Target - before.Target).Length > 1, "A right drag pans");
+                check(c.ContextMenu == null || !c.ContextMenu.IsOpen, "A right drag does not open the menu");
+
+                before = wh.Camera;
+                await Task.Run(() => { mouse_event(0x800, 0, 0, 120, IntPtr.Zero); Thread.Sleep(300); });
+                check(wh.Camera.Distance < before.Distance, "The wheel zooms in");
+
+                wh.SetView(WarehouseView.Plan);
+                while (wh.Flying) await Task.Delay(30);
+                await Task.Delay(300);
+                await Task.Run(() =>
+                {
+                    SetCursorPos((int)plan.X, (int)plan.Y);
+                    Thread.Sleep(200);
+                    mouse_event(2, 0, 0, 0, IntPtr.Zero);
+                    Thread.Sleep(80);
+                    mouse_event(4, 0, 0, 0, IntPtr.Zero);
+                    Thread.Sleep(600);
+                });
+                check(wh.Pinned != null, "A real click pins " + wh.Pinned);
+                ((IVisualHost)c).ClearSelection();
+                await Task.Delay(300);
+
+                await Task.Run(() =>
+                {
+                    mouse_event(8, 0, 0, 0, IntPtr.Zero);
+                    Thread.Sleep(80);
+                    mouse_event(16, 0, 0, 0, IntPtr.Zero);
+                    Thread.Sleep(500);
+                });
+                check(c.ContextMenu != null && c.ContextMenu.IsOpen, "A plain right-click opens the menu");
+                if (c.ContextMenu != null) c.ContextMenu.IsOpen = false;
+                wh.SetView(WarehouseView.Overview);
+                while (wh.Flying) await Task.Delay(30);
+            }
+            finally
+            {
+                SetCursorPos(home.X, home.Y);
+                Topmost = false;
+            }
+        }
 
         /// <summary>Drives the real cursor through OLE drag and the canvas. Skipped if someone is using the machine.</summary>
         private async Task RealInputCheck(Func<string, Task> snap, List<string> log)

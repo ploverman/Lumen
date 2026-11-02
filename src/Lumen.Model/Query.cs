@@ -31,6 +31,8 @@ namespace Lumen.Model
         public int Limit { get; set; } = 3500;
         /// <summary>Also evaluate each measure with no group filter.</summary>
         public bool IncludeTotals { get; set; }
+        /// <summary>Asks the report surface to add no filters from any scope. A visual uses this for reference data that must not narrow, such as a floor plan.</summary>
+        public bool Unfiltered { get; set; }
     }
 
     /// <summary>Describes one column of a <see cref="QueryResult"/>.</summary>

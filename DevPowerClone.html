@@ -100,6 +100,7 @@ src\Lumen.Desktop\bin\Release\Lumen.exe</code></pre>
 <tr><th>Command line</th><th>Effect</th></tr>
 <tr><td><code>Lumen.exe file.lumen</code></td><td>Opens a report.</td></tr>
 <tr><td><code>Lumen.exe --screenshot out.png</code></td><td>End-to-end self-check. Writes <code>out-*.png</code>, <code>out.log</code> and <code>out.pdf</code>, and exits. The log ends in <code>OK</code> on success.</td></tr>
+<tr><td><code>Lumen.exe --warehouse out.lumen</code></td><td>Drives the warehouse visual through views, colors, picking, selection and slicers, logs a frame rate, and saves the sample as <code>out.lumen</code> with <code>out-*.png</code> and <code>out.log</code> beside it. Exit code 0 means every check passed. After 30 s of idle it also tests with the real mouse.</td></tr>
 <tr><td><code>Lumen.exe --bench 10000000 out.txt</code></td><td>Slicer-to-redraw timing at a given row count. Appends to the output file.</td></tr>
 </table>
 <p><code>Directory.Build.props</code> sets <code>NoWarn</code> for <code>NU1701</code>, <code>NETSDK1138</code> and <code>CS1591</code>. To audit XML docs, build with <code>-p:GenerateDocumentationFile=true "-p:NoWarn=NU1701%3BNETSDK1138"</code>. The only members undocumented today are enum members declared on one line and <code>SetBoundsCommand.Bounds</code>' fields.</p>
@@ -126,7 +127,7 @@ src\Lumen.Desktop\bin\Release\Lumen.exe</code></pre>
 <tr><td><code>Lumen.Engine</code></td><td><code>Columns.cs</code>, <code>Dataset.cs</code>, <code>FilterContext.cs</code>, <code>QueryEngine.cs</code>, <code>LqlParser.cs</code>, <code>LqlCompiler.cs</code></td><td>Column store, filter propagation, query execution, formula language.</td><td></td></tr>
 <tr><td><code>Lumen.Connectors</code></td><td><code>Connectors.cs</code>, <code>Transforms.cs</code>, <code>SampleData.cs</code></td><td>CSV, Excel, JSON and SQL readers; transform steps; relationship detection; sample data.</td><td>ExcelDataReader</td></tr>
 <tr><td><code>Lumen.Charting</code></td><td><code>Scales.cs</code></td><td>Scales, format strings, frozen brushes, geometry builders, <code>ChartHost</code>.</td><td></td></tr>
-<tr><td><code>Lumen.Visuals</code></td><td><code>Contracts.cs</code>, <code>Charts.cs</code>, <code>Grids.cs</code>, <code>Slicer.cs</code></td><td>The visual contract, format options, themes, registry, 14 visual types.</td><td></td></tr>
+<tr><td><code>Lumen.Visuals</code></td><td><code>Contracts.cs</code>, <code>Charts.cs</code>, <code>Grids.cs</code>, <code>Slicer.cs</code>, <code>WarehouseModel.cs</code>, <code>WarehouseScene.cs</code>, <code>WarehouseVisual.cs</code></td><td>The visual contract, format options, themes, registry, 15 visual types.</td><td></td></tr>
 <tr><td><code>Lumen.Reporting</code></td><td><code>ReportSession.cs</code>, <code>ReportSurface.cs</code>, <code>FiltersPane.cs</code>, <code>Exporter.cs</code>, <code>VirtualRows.cs</code>, <code>Ui.cs</code>, <code>Chrome.xaml</code></td><td>What any app that shows a report needs: session without undo, page surface, file format, filter pane, export, chrome styles.</td><td>PDFsharp-wpf</td></tr>
 <tr><td><code>Lumen.Desktop</code></td><td><code>Session.cs</code>, <code>ReportCanvas.cs</code>, <code>MainWindow.cs</code>, <code>Panes.cs</code>, <code>Views.cs</code>, <code>Dialogs.cs</code></td><td>The builder: undo, editing canvas, shell, panes, dialogs, self-checks.</td><td>AvalonEdit</td></tr>
 <tr><td><code>Lumen.Viewer</code></td><td><code>ViewerWindow.cs</code>, <code>ViewerCheck.cs</code></td><td>The read-only viewer and its self-check. Output is <code>LumenViewer.exe</code>.</td><td></td></tr>
@@ -288,6 +289,27 @@ internal delegate FilterContext Modifier(EvalCtx outer, FilterContext f);  // CA
 <li><b>Slicers</b> rebuild their controls only when style or field changes, and <code>_updating</code> stops control updates from publishing filters.</li>
 </ul>
 
+<h3 id="warehouse">The warehouse visual</h3>
+<p>Key <code>warehouse3d</code>. It is the only visual that does not draw on a <code>ChartHost</code>: it hosts a <code>Viewport3D</code>, so <code>ChartVisual</code> does not apply and it implements <code>ILumenVisual</code> directly. It lives in <code>Lumen.Visuals</code>, which is why the viewer has it with no code of its own.</p>
+<table>
+<tr><th>File</th><th>Role</th></tr>
+<tr><td><code>WarehouseModel.cs</code></td><td><code>WarehouseLayout</code> turns rows into world-space bounds and bay row totals, and does the ray pick. <code>WarehousePalette</code> holds the color bands, and the legend reads the same object, so the two cannot disagree. No UI, so the unit tests cover it.</td></tr>
+<tr><td><code>WarehouseScene.cs</code></td><td><code>MeshBatch</code> merges boxes of one color into frozen meshes of under 60,000 vertices. <code>WarehouseScene</code> builds the structure, heat, highlight and label models.</td></tr>
+<tr><td><code>WarehouseVisual.cs</code></td><td>The visual: queries, change detection, overlays, camera flights and mouse handling. <code>WarehouseCamera</code> is the orbit state.</td></tr>
+</table>
+<p>Decisions worth keeping:</p>
+<ul>
+<li><b>Two queries.</b> The first is filtered and says what is visible. The second sets <code>QuerySpec.Unfiltered</code>, which makes <code>ReportSurface.ComposeFilters</code> add nothing, and it drives the layout. Otherwise a slicer on level 60 would drop that level to the floor. The unfiltered result comes from the engine's cache, and <code>Update</code> compares it by reference to skip the layout.</li>
+<li><b>Update does the least it can.</b> Layout runs when the rows or format change, the structure when the visible set or theme changes, the heat when the filter changes or the mode changes. A selection or a resize touches no geometry.</li>
+<li><b>No WPF hit testing.</b> <code>IsHitTestVisible</code> is false on the viewport, because <code>Viewport3D</code> hit testing walks triangles in managed code. <code>WarehouseLayout.Pick</code> tests the ray against bay row bounds, then the slots of rows it hit. The root grid has a transparent background so it gets the mouse.</li>
+<li><b>Draw order matters.</b> WPF does not sort transparency, and transparent pixels still write depth. Hence opaque colors before translucent ones in <code>Heat</code>, and the labels in the last <code>ModelVisual3D</code>. Translucent boxes do not sort among themselves, so a nearer open slot can hide a farther one.</li>
+<li><b>The near plane follows the distance.</b> The plan view uses a 14 degree lens from far away to look orthographic. With a fixed near plane the depth buffer could not separate the tiles from the floor.</li>
+<li><b>Field of view is horizontal</b> in WPF. <code>WarehouseCamera.Ray</code> derives the vertical extent from the aspect ratio.</li>
+<li><b>Flights</b> run on <code>CompositionTarget.Rendering</code> and detach when they end, on unload, and in <code>Dispose</code>, since that static event would otherwise keep a removed visual alive.</li>
+<li><b>Selection keys.</b> A location's key is its id, and a bay row's key starts with <code>row</code>. A location cross-filters on Location ID, a tile on Aisle plus Bay row, or on Aisle plus its Bays. The visual's own selection does not filter it, so <code>IsInteractiveControl</code> and the normal cross-filter path are all it needs.</li>
+</ul>
+<p><code>WarehouseSample</code> in <code>Lumen.Connectors</code> generates the data with a fixed seed. LQL has no context transition, so "bay rows over 70%" cannot be a measure over a row-level measure; the sample stores a <code>Bay Row Band</code> column and counts distinct bay row keys with it. Layout assumes at most two bays per bay row.</p>
+
 <h2 id="shell">12. Desktop shell</h2>
 <table>
 <tr><th>Class</th><th>Job</th></tr>
@@ -402,7 +424,7 @@ public double LegendFontSize { get; set; } = 11;</code></pre>
 
 <h2 id="tests">16. Tests and self-checks</h2>
 <p><code>tests/Lumen.Engine.Tests</code> has 24 xUnit tests, all passing. Expected values come from a plain LINQ walk over the same rows, so the engine isn't checked against itself. Two fixtures exist: 20,000 rows for the serial paths, and 400,000 rows to cross the parallel threshold of <code>Par.Chunk * 2</code>. Anything that branches on size needs a test on the large fixture.</p>
-<p>Coverage is engine, LQL, CSV, transforms, column serialization and the command stack. UI is covered by the <code>--screenshot</code> self-check, not by unit tests.</p>
+<p>Coverage is engine, LQL, CSV, transforms, column serialization, the command stack, and the warehouse layout, picking and camera math. UI is covered by the <code>--screenshot</code> and <code>--warehouse</code> self-checks, not by unit tests.</p>
 <h3>The --screenshot self-check</h3>
 <p><code>MainWindow.RunScreenshot</code> drives the real shell: all sample pages, cross-highlight, slicer, undo, each visual selected, every visual type, copy, paste and align, CSV and JSON import, measure, transform and SQL windows, SQL import, save and reopen, Dark and High contrast, and PDF. If the machine has been idle for 30 seconds, <code>RealInputCheck</code> injects real mouse input with <code>mouse_event</code> to test OLE drag and drop and canvas gestures, since WPF's drag loop ignores simulated events. Unhandled exceptions are collected in <code>App.Failures</code>, and fail the run.</p>
 <p>The SQL portion expects local SQL Server instances, which are specific to the development machine. Its failures should be read accordingly.</p>

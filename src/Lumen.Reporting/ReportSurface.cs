@@ -384,6 +384,7 @@ namespace Lumen.Reporting
         /// A slicer does not filter itself, so it keeps offering its other values.</summary>
         private void ComposeFilters(VisualContainer target, QuerySpec spec)
         {
+            if (spec.Unfiltered) return;
             var page = Page;
             var def = target.Def;
             spec.Filters.AddRange(Report.Doc.ReportFilters);

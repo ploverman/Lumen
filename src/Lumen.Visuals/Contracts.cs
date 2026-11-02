@@ -318,6 +318,76 @@ namespace Lumen.Visuals
         [FormatCard("Slicer"), FormatProperty("Style")] public SlicerStyle Style { get; set; } = SlicerStyle.List;
     }
 
+    /// <summary>The camera positions of the warehouse visual.</summary>
+    public enum WarehouseView { Overview, Plan, Aisle }
+
+    /// <summary>What the warehouse visual colors its boxes and floor tiles by.</summary>
+    public enum WarehouseColor { FillRate, StockAge, OpenSlots }
+
+    /// <summary>Options of the warehouse visual. The floor plan is derived from the wells, so these sizes shape it without any coordinates in the data.</summary>
+    public class WarehouseFormat : VisualFormat
+    {
+        /// <summary>The scene fills the visual, so the title is off and the padding is gone by default.</summary>
+        public WarehouseFormat() { ShowTitle = false; Padding = 0; }
+
+        /// <summary>Clear height of one level, in meters.</summary>
+        [FormatCard("Geometry"), FormatProperty("Level height (m)", Min = 0.8, Max = 5)] public double LevelHeight { get; set; } = 1.6;
+        /// <summary>Slot width along the aisle, in meters.</summary>
+        [FormatCard("Geometry"), FormatProperty("Location width (m)", Min = 0.4, Max = 5)] public double LocationWidth { get; set; } = 1.2;
+        /// <summary>Slot depth across the aisle, in meters.</summary>
+        [FormatCard("Geometry"), FormatProperty("Location depth (m)", Min = 0.4, Max = 5)] public double LocationDepth { get; set; } = 1.2;
+        /// <summary>Clear aisle width, in meters.</summary>
+        [FormatCard("Geometry"), FormatProperty("Aisle width (m)", Min = 1, Max = 12)] public double AisleWidth { get; set; } = 3.4;
+        /// <summary>Space between zones, in meters.</summary>
+        [FormatCard("Geometry"), FormatProperty("Zone gap (m)", Min = 0, Max = 100)] public double ZoneGap { get; set; } = 14;
+        /// <summary>Zones per row of the floor plan.</summary>
+        [FormatCard("Geometry"), FormatProperty("Zones across", Min = 1, Max = 12)] public int ZonesAcross { get; set; } = 2;
+
+        /// <summary>A bay row under this percentage is low.</summary>
+        [FormatCard("Heat colours"), FormatProperty("Fill rate low (%)", Min = 0, Max = 100)] public int FillLow { get; set; } = 30;
+        /// <summary>A bay row over this percentage is high.</summary>
+        [FormatCard("Heat colours"), FormatProperty("Fill rate high (%)", Min = 0, Max = 100)] public int FillHigh { get; set; } = 70;
+        /// <summary>Upper limit of the youngest stock age band, in days.</summary>
+        [FormatCard("Heat colours"), FormatProperty("Stock age fresh (days)", Min = 1)] public int AgeFresh { get; set; } = 30;
+        /// <summary>Upper limit of the second band, in days.</summary>
+        [FormatCard("Heat colours"), FormatProperty("Stock age middle (days)", Min = 1)] public int AgeMiddle { get; set; } = 90;
+        /// <summary>Upper limit of the third band, in days. Older stock is the fourth band.</summary>
+        [FormatCard("Heat colours"), FormatProperty("Stock age old (days)", Min = 1)] public int AgeOld { get; set; } = 180;
+        /// <summary>Lowest open slot count of the second band.</summary>
+        [FormatCard("Heat colours"), FormatProperty("Open slots low", Min = 1)] public int OpenLow { get; set; } = 6;
+        /// <summary>Lowest open slot count of the third band.</summary>
+        [FormatCard("Heat colours"), FormatProperty("Open slots middle", Min = 1)] public int OpenMiddle { get; set; } = 20;
+        /// <summary>Lowest open slot count of the top band.</summary>
+        [FormatCard("Heat colours"), FormatProperty("Open slots high", Min = 1)] public int OpenHigh { get; set; } = 40;
+        /// <summary>Low fill color. Null uses the default.</summary>
+        [FormatCard("Heat colours"), FormatProperty("Low fill (hex)")] public string ColorUnder { get; set; }
+        /// <summary>Middle fill color. Null uses the default.</summary>
+        [FormatCard("Heat colours"), FormatProperty("Middle fill (hex)")] public string ColorMiddle { get; set; }
+        /// <summary>High fill color. Null uses the default.</summary>
+        [FormatCard("Heat colours"), FormatProperty("High fill (hex)")] public string ColorOver { get; set; }
+        /// <summary>Carton color in the Fill rate mode. Null uses the default.</summary>
+        [FormatCard("Heat colours"), FormatProperty("Occupied box (hex)")] public string ColorOccupied { get; set; }
+        /// <summary>Upright color. Null uses the default.</summary>
+        [FormatCard("Heat colours"), FormatProperty("Uprights (hex)")] public string ColorUpright { get; set; }
+        /// <summary>Beam color. Null uses the default.</summary>
+        [FormatCard("Heat colours"), FormatProperty("Beams (hex)")] public string ColorBeam { get; set; }
+
+        /// <summary>The Status value that means a location holds stock. Anything else counts as open.</summary>
+        [FormatCard("Interface"), FormatProperty("Filled status value")] public string FilledValue { get; set; } = "Filled";
+        /// <summary>The view on opening.</summary>
+        [FormatCard("Interface"), FormatProperty("Start view")] public WarehouseView StartView { get; set; } = WarehouseView.Overview;
+        /// <summary>The color mode on opening.</summary>
+        [FormatCard("Interface"), FormatProperty("Start color")] public WarehouseColor StartColor { get; set; } = WarehouseColor.FillRate;
+        /// <summary>Length of a camera flight. Zero jumps.</summary>
+        [FormatCard("Interface"), FormatProperty("Camera flight (ms)", Min = 0, Max = 5000)] public double FlightMs { get; set; } = 1100;
+        /// <summary>Show the hint and the mode and view buttons.</summary>
+        [FormatCard("Interface"), FormatProperty("Toolbar")] public bool ShowToolbar { get; set; } = true;
+        /// <summary>Show the legend.</summary>
+        [FormatCard("Interface"), FormatProperty("Legend")] public bool ShowLegend { get; set; } = true;
+        /// <summary>Show the pinned callout on a click.</summary>
+        [FormatCard("Interface"), FormatProperty("Callout")] public bool ShowCallout { get; set; } = true;
+    }
+
     /// <summary>The catalog of visual types. Keys are stored in report files, so they must not change.</summary>
     public static class VisualRegistry
     {
@@ -336,7 +406,8 @@ namespace Lumen.Visuals
             { "pie", () => new PieVisual(false) },
             { "donut", () => new PieVisual(true) },
             { "scatter", () => new ScatterVisual() },
-            { "slicer", () => new SlicerVisual() }
+            { "slicer", () => new SlicerVisual() },
+            { "warehouse3d", () => new WarehouseVisual() }
         };
 
         /// <summary>All type keys, in gallery order.</summary>

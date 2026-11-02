@@ -27,7 +27,8 @@ namespace Lumen.Reporting
             { "pie", "M8,8V1A7,7 0 1 0 15,8z M9,0A7,7 0 0 1 16,7H9z" },
             { "donut", "M8,1A7,7 0 1 1 7.99,1z M8,5A3,3 0 1 0 8.01,5z" },
             { "scatter", "M3,10h2v2H3z M7,6h2v2H7z M10,9h2v2h-2z M12,3h2v2h-2z M5,4h2v2H5z" },
-            { "slicer", "M1,2h14L10,8v6L6,12V8z" }
+            { "slicer", "M1,2h14L10,8v6L6,12V8z" },
+            { "warehouse3d", "M8,1L15,4.5V11.5L8,15L1,11.5V4.5z M8,3L3.2,5.4L8,7.8L12.8,5.4z M2.5,6.6V10.6L7.2,13V9z M13.5,6.6L8.8,9V13L13.5,10.6z" }
         }.ToDictionary(kv => kv.Key, kv => (Geometry)Freeze(Geometry.Parse(kv.Value)));
 
         private static Geometry Freeze(Geometry g) { g.Freeze(); return g; }

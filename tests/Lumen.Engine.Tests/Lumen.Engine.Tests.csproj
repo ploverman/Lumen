@@ -1,11 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>false</IsPackable>
+    <UseWPF>true</UseWPF>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Lumen.Model\Lumen.Model.csproj" />
     <ProjectReference Include="..\..\src\Lumen.Engine\Lumen.Engine.csproj" />
     <ProjectReference Include="..\..\src\Lumen.Connectors\Lumen.Connectors.csproj" />
+    <ProjectReference Include="..\..\src\Lumen.Visuals\Lumen.Visuals.csproj" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
     <PackageReference Include="xunit" Version="2.4.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.4.5" />

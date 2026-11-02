@@ -8,10 +8,10 @@ using System.Windows.Threading;
 
 namespace Lumen.Desktop
 {
-    /// <summary>Entry point. Parses the command line: --bench and --screenshot run a check and exit; otherwise a .lumen argument opens, or a recovery file is offered.</summary>
+    /// <summary>Entry point. Parses the command line: --bench, --screenshot and --warehouse run a check and exit; otherwise a .lumen argument opens, or a recovery file is offered.</summary>
     public partial class App : Application
     {
-        /// <summary>True during --bench and --screenshot: unhandled errors are collected, not shown, so nothing waits on a message box.</summary>
+        /// <summary>True during --bench, --screenshot and --warehouse: unhandled errors are collected, not shown, so nothing waits on a message box.</summary>
         internal static bool SelfCheck;
         /// <summary>Errors collected during a check, which then reports failure.</summary>
         internal static readonly System.Collections.Generic.List<string> Failures = new System.Collections.Generic.List<string>();
@@ -38,6 +38,14 @@ namespace Lumen.Desktop
             {
                 SelfCheck = true;
                 window.RunScreenshot(e.Args[shot + 1]);
+                return;
+            }
+
+            int warehouse = Array.IndexOf(e.Args, "--warehouse");
+            if (warehouse >= 0 && warehouse + 1 < e.Args.Length)
+            {
+                SelfCheck = true;
+                window.RunWarehouseCheck(e.Args[warehouse + 1]);
                 return;
             }
 

@@ -79,6 +79,71 @@ namespace Lumen.Desktop
         protected override void OnReplaced() => Stack.Clear();
     }
 
+    /// <summary>The warehouse sample: one dashboard page around the 3D visual, laid out like the Power BI page it mirrors.</summary>
+    public static class WarehouseReport
+    {
+        /// <summary>Builds the document and its data.</summary>
+        public static ReportDocument Build(out Dictionary<string, TableData> tables)
+        {
+            SemanticModel model;
+            tables = WarehouseSample.BuildDataset(out model).Tables;
+            var doc = new ReportDocument { Name = "Warehouse Occupancy 3D", Model = model };
+            var table = model.TableByName("Locations");
+            Func<string, FieldRef> col = c => FieldRef.ForColumn(table.Id, table.ColumnByName(c).Id);
+            Func<string, FieldRef> m = n => FieldRef.ForMeasure(model.MeasureByName(n).Id);
+            var page = new PageDef { Name = "Warehouse Occupancy" };
+
+            // Slicers across the top. Their dropdown popups open over the page.
+            string[] slicers = { "Zone", "Aisle", "Level", "Stock Age Band", "Status" };
+            for (int i = 0; i < slicers.Length; i++)
+            {
+                var s = Add(page, "slicer", 216 + i * 164, 8, 156, 58, slicers[i], "field", col(slicers[i]));
+                s.Format["Style"] = "Dropdown";
+                s.Format["TitleSize"] = 10;
+                s.Format["Padding"] = 2;
+            }
+
+            // Cards down the left, two by three.
+            var cards = new[] { "Total Locations", "Filled", "Fill Rate", "Open Slots", "Rows Over 70%", "Avg Stock Age" };
+            for (int i = 0; i < cards.Length; i++)
+            {
+                var c = Add(page, "card", 8 + (i % 2) * 100, 8 + (i / 2) * 84, 96, 80, null, "values", m(cards[i]));
+                c.Format["ValueSize"] = 20;
+                c.Format["Units"] = "None";
+                c.Format["Padding"] = 2;
+            }
+            Add(page, "clusteredBar", 8, 264, 196, 448, "Fill rate by level", "category", col("Level"), "values", m("Fill Rate"));
+
+            Add(page, "warehouse3d", 216, 74, 816, 638, null,
+                "location", col("Location ID"), "zone", col("Zone"), "aisle", col("Aisle"), "bayRow", col("Bay Row"), "bay", col("Bay"),
+                "level", col("Level"), "position", col("Position"), "status", col("Status"), "sku", col("SKU"), "units", col("Units"), "age", col("Stock Age Days"));
+
+            Add(page, "clusteredBar", 1040, 8, 232, 196, "Fill rate by zone", "category", col("Zone"), "values", m("Fill Rate"));
+            var fullest = Add(page, "table", 1040, 212, 232, 216, "Fullest aisles", "values", col("Aisle"), "values", m("Fill Rate"), "values", m("Open Slots"));
+            fullest.VisualFilters.Add(new FilterDef { Target = col("Aisle"), Type = FilterType.TopN, TopCount = 6, TopBy = m("Fill Rate") });
+            var open = Add(page, "table", 1040, 436, 232, 276, "Most open slots", "values", col("Aisle"), "values", m("Open Slots"), "values", m("Fill Rate"));
+            open.VisualFilters.Add(new FilterDef { Target = col("Aisle"), Type = FilterType.TopN, TopCount = 9, TopBy = m("Open Slots") });
+
+            doc.Pages.Add(page);
+            return doc;
+        }
+
+        /// <summary>Adds a visual. <paramref name="pairs"/> is role name and field pairs.</summary>
+        private static VisualDef Add(PageDef page, string type, double x, double y, double w, double h, string title, params object[] pairs)
+        {
+            var v = new VisualDef { Type = type, X = x, Y = y, Width = w, Height = h, ZIndex = page.Visuals.Count };
+            if (title != null) v.Format["Title"] = title;
+            for (int i = 0; i + 1 < pairs.Length; i += 2)
+            {
+                string role = (string)pairs[i];
+                if (!v.Roles.ContainsKey(role)) v.Roles[role] = new List<FieldRef>();
+                v.Roles[role].Add((FieldRef)pairs[i + 1]);
+            }
+            page.Visuals.Add(v);
+            return v;
+        }
+    }
+
     /// <summary>The sample model plus a three-page report, for a first run with no data of your own.</summary>
     public static class SampleReport
     {

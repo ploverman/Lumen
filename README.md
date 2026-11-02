@@ -17,7 +17,7 @@ Needs Visual Studio 2022 (or its MSBuild) with the .NET Framework 4.7 targeting 
 src/Lumen.Desktop/bin/Release/Lumen.exe
 ```
 
-Home > Get data > Sample report loads a three-page demo. You can also pass a `.lumen` file on the command line.
+Home > Get data > Sample report loads a three-page demo. Home > Get data > Warehouse sample loads the 3D warehouse dashboard. You can also pass a `.lumen` file on the command line.
 
 ## Lumen Viewer
 
@@ -44,6 +44,7 @@ dotnet test tests/Lumen.Engine.Tests/Lumen.Engine.Tests.csproj --no-build -c Rel
 | Command | What it does |
 | --- | --- |
 | `Lumen.exe --screenshot out.png` | Drives the real shell through pages, cross-filtering, slicers, undo, imports, dialogs, themes, save and reopen, and PDF. Writes `out-*.png` and `out.log`. If the machine has been idle for 30 s it also moves the real mouse for a few seconds to test drag and drop. |
+| `Lumen.exe --warehouse out.lumen` | Drives the warehouse visual through views, colors, picking, selection and slicers, saves the sample report, and writes `out-*.png` and `out.log`. Exit code 0 means every check passed. |
 | `Lumen.exe --bench 10000000 out.txt` | Times slicer clicks at the given row count and reports memory. |
 | `LumenViewer.exe --check report.lumen out.png` | Drives the viewer through every page, a slicer, a cross-filter, Reset, refresh and PDF, checks the file is unchanged, and writes `out-*.png` and `out.log`. Exit code 0 means every step passed. |
 
@@ -55,7 +56,7 @@ dotnet test tests/Lumen.Engine.Tests/Lumen.Engine.Tests.csproj --no-build -c Rel
 | `Lumen.Engine` | Columnar store, dictionary encoding, filter propagation, LQL parser and compiler, query execution. |
 | `Lumen.Connectors` | CSV, Excel, JSON, SQL Server, transform steps, sample data. |
 | `Lumen.Charting` | Scales, Power BI format strings, `DrawingVisual` chart host. |
-| `Lumen.Visuals` | Visual contracts, format options, themes, and the 14 visual types. |
+| `Lumen.Visuals` | Visual contracts, format options, themes, and the 15 visual types. |
 | `Lumen.Reporting` | What any app that shows a report needs: `ReportSession`, `ReportSurface`, the `.lumen` reader and writer, filter pane, export, chrome styles. |
 | `Lumen.Desktop` | The builder: undo, editing canvas, panes, views, dialogs. |
 | `Lumen.Viewer` | The read-only viewer, a window of about 450 lines over `Lumen.Reporting`. |
