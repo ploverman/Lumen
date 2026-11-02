@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<SyntaxDefinition name="LQL" xmlns="http://icsharpcode.net/sharpdevelop/syntaxdefinition/2008">
+  <Color name="Comment" foreground="#6A9955" />
+  <Color name="String" foreground="#C2703D" />
+  <Color name="Keyword" foreground="#2F7DD1" fontWeight="bold" />
+  <Color name="Function" foreground="#8A5FD0" />
+  <Color name="Column" foreground="#1E9E7A" />
+  <Color name="Table" foreground="#B8860B" />
+  <Color name="Number" foreground="#C14A8A" />
+  <RuleSet ignoreCase="true">
+    <Span color="Comment" begin="//" />
+    <Span color="Comment" multiline="true" begin="/\*" end="\*/" />
+    <Span color="String" begin="&quot;" end="&quot;" />
+    <Span color="Table" begin="'" end="'" />
+    <Span color="Column" begin="\[" end="\]" />
+    <Keywords color="Keyword">
+      <Word>VAR</Word>
+      <Word>RETURN</Word>
+      <Word>IN</Word>
+    </Keywords>
+    <Rule color="Function">\b[A-Za-z_][A-Za-z0-9_.]*(?=\s*\()</Rule>
+    <Rule color="Number">\b\d+(\.\d+)?\b</Rule>
+  </RuleSet>
+</SyntaxDefinition>

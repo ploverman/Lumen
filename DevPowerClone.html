@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lumen Developer Manual</title>
+<style>:root{--bg:#fff;--fg:#1f2328;--muted:#59636e;--line:#d8dee4;--panel:#f6f8fa;--accent:#0f6cbd;--note:#eaf3fb;--warn:#fff4e0;--warn-line:#c77700;--code:#f2f4f7}
+@media (prefers-color-scheme:dark){:root{--bg:#16181c;--fg:#e6e8eb;--muted:#a3abb5;--line:#343a42;--panel:#1e2126;--accent:#6cb4f5;--note:#17293a;--warn:#33270f;--warn-line:#e0a030;--code:#23272d}}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:12px}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 "Segoe UI",system-ui,sans-serif}
+.layout{display:grid;grid-template-columns:290px minmax(0,1fr);max-width:1400px;margin:0 auto}
+nav.toc{position:sticky;top:0;align-self:start;height:100vh;overflow:auto;padding:24px 16px 24px 24px;border-right:1px solid var(--line);font-size:14px}
+nav.toc .brand{font-weight:600;font-size:18px;margin-bottom:2px}
+nav.toc .sub{color:var(--muted);font-size:13px;margin-bottom:14px}
+nav.toc ol{list-style:none;margin:0;padding:0;counter-reset:s}
+nav.toc li{counter-increment:s}
+nav.toc a{display:block;padding:4px 8px;border-radius:5px;color:var(--fg);text-decoration:none}
+nav.toc a::before{content:counter(s) ". ";color:var(--muted)}
+nav.toc a:hover{background:var(--panel);color:var(--accent)}
+main{padding:32px 48px 80px;min-width:0;max-width:980px}
+h1{font-size:34px;line-height:1.2;margin:0 0 8px}
+h2{font-size:25px;line-height:1.3;margin:52px 0 12px;padding-top:12px;border-top:1px solid var(--line)}
+h3{font-size:19px;margin:30px 0 8px}
+h4{font-size:16px;margin:22px 0 6px}
+.lead{font-size:18px;color:var(--muted);margin:0 0 20px}
+a{color:var(--accent)}
+code,kbd,pre{font-family:Consolas,"Cascadia Mono",monospace;font-size:.92em}
+code{background:var(--code);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+pre{background:var(--code);padding:12px 14px;border-radius:6px;overflow:auto;line-height:1.45;border:1px solid var(--line)}
+pre code{background:none;padding:0;overflow-wrap:normal}
+kbd{border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel);white-space:nowrap}
+table{border-collapse:collapse;width:100%;margin:14px 0;font-size:15px;display:block;overflow-x:auto}
+th,td{border:1px solid var(--line);padding:6px 10px;text-align:left;vertical-align:top}
+th{background:var(--panel);font-weight:600}
+figure{margin:18px 0}
+figure img,figure svg{max-width:100%;height:auto;display:block;border:1px solid var(--line);border-radius:6px}
+figcaption{color:var(--muted);font-size:14px;margin-top:6px}
+.note,.warn{padding:10px 14px;border-radius:6px;margin:14px 0;border-left:4px solid var(--accent);background:var(--note)}
+.warn{border-left-color:var(--warn-line);background:var(--warn)}
+.note>:first-child,.warn>:first-child{margin-top:0}.note>:last-child,.warn>:last-child{margin-bottom:0}
+ol.steps li{margin:6px 0}
+svg text{fill:var(--fg);font:13px "Segoe UI",sans-serif}
+svg .box{fill:var(--panel);stroke:var(--muted)}
+svg .ln{stroke:var(--muted);stroke-width:1.5;fill:none}
+svg .head{fill:var(--muted)}
+footer{margin-top:60px;padding-top:14px;border-top:1px solid var(--line);color:var(--muted);font-size:14px}
+@media (max-width:900px){.layout{display:block}nav.toc{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line);padding:16px}main{padding:20px 16px 60px}h1{font-size:28px}}
+@media print{nav.toc{display:none}.layout{display:block}main{max-width:none;padding:0}h2{break-after:avoid}figure,pre,table{break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc" aria-label="Contents">
+<div class="brand">Lumen</div>
+<div class="sub">Developer manual</div>
+<ol>
+<li><a href="#orient">Orientation</a></li>
+<li><a href="#build">Build, run, test</a></li>
+<li><a href="#solution">Solution structure</a></li>
+<li><a href="#flow">A slicer click, end to end</a></li>
+<li><a href="#model">Lumen.Model</a></li>
+<li><a href="#storage">Engine: column store</a></li>
+<li><a href="#filter">Engine: filters</a></li>
+<li><a href="#query">Engine: query execution</a></li>
+<li><a href="#lql">LQL: parser and compiler</a></li>
+<li><a href="#conn">Connectors and transforms</a></li>
+<li><a href="#visual">Charting and visuals</a></li>
+<li><a href="#shell">Desktop shell</a></li>
+<li><a href="#undo">Undo model</a></li>
+<li><a href="#file">The .lumen format</a></li>
+<li><a href="#recipes">Extension recipes</a></li>
+<li><a href="#tests">Tests and self-checks</a></li>
+<li><a href="#perf">Measured performance</a></li>
+<li><a href="#gaps">Known gaps and traps</a></li>
+<li><a href="#prd">Differences from the PRD</a></li>
+</ol>
+</nav>
+<main>
+<h1>Lumen Developer Manual</h1>
+<p class="lead">Architecture, data flow and extension points of Lumen, for an experienced C# developer picking up the code. It assumes you know WPF and async, and have used Power BI or another tabular BI tool.</p>
+
+<h2 id="orient">1. Orientation</h2>
+<p>Lumen is a Power BI Desktop-style report builder: WPF on .NET Framework 4.7, x64, C# 7.3, no JavaScript and no browser control. It is about 12,800 lines of C# in six projects, plus a test project. The specification is <code>PRD-dashboard-builder-wpf-net47-no-js.md</code>, and this code is its Phase 1 MVP (section 5.1). Phases 3 and 4, which cover the server, were not built.</p>
+<p>Four design decisions explain most of the code:</p>
+<ol>
+<li><b>Everything is columnar and dictionary-encoded.</b> Filters become bitsets over rows, and aggregations run over typed arrays. Allocation per row is avoided on every query path.</li>
+<li><b>The document is JSON-serializable data.</b> <code>ReportDocument</code> holds no behavior or row data, so undo is a JSON snapshot, and save is that JSON plus column files.</li>
+<li><b>Charts are retained-mode <code>DrawingVisual</code>s, not element trees.</b> A chart is one <code>FrameworkElement</code>. Hit testing goes through a plain list of marks.</li>
+<li><b>Visuals don't touch the engine.</b> A visual declares queries and receives results. All data access runs in one batch that the canvas owns.</li>
+</ol>
+<div class="note"><p>Language rule: C# 7.3 only. No switch expressions, <code>using var</code>, <code>??=</code>, records, nullable references or target-typed <code>new</code>. There is no XAML apart from <code>App.xaml</code> (theme-aware styles); views are built in code using the helpers in <code>Ui</code>.</p></div>
+
+<h2 id="build">2. Build, run, test</h2>
+<p>You need Visual Studio 2022 or its MSBuild, with the .NET Framework 4.7 targeting pack. The projects are SDK-style, but use MSBuild and not <code>dotnet build</code>, because <code>UseWPF</code> on a Framework target needs the desktop toolchain.</p>
+<pre><code>"C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe" Lumen.sln -restore -p:Configuration=Release
+dotnet test tests\Lumen.Engine.Tests\Lumen.Engine.Tests.csproj --no-build -c Release
+src\Lumen.Desktop\bin\Release\Lumen.exe</code></pre>
+<table>
+<tr><th>Command line</th><th>Effect</th></tr>
+<tr><td><code>Lumen.exe file.lumen</code></td><td>Opens a report.</td></tr>
+<tr><td><code>Lumen.exe --screenshot out.png</code></td><td>End-to-end self-check. Writes <code>out-*.png</code>, <code>out.log</code> and <code>out.pdf</code>, and exits. The log ends in <code>OK</code> on success.</td></tr>
+<tr><td><code>Lumen.exe --bench 10000000 out.txt</code></td><td>Slicer-to-redraw timing at a given row count. Appends to the output file.</td></tr>
+</table>
+<p><code>Directory.Build.props</code> sets <code>NoWarn</code> for <code>NU1701</code>, <code>NETSDK1138</code> and <code>CS1591</code>. To audit XML docs, build with <code>-p:GenerateDocumentationFile=true "-p:NoWarn=NU1701%3BNETSDK1138"</code>. The only members undocumented today are enum members declared on one line and <code>SetBoundsCommand.Bounds</code>' fields.</p>
+
+<h2 id="solution">3. Solution structure</h2>
+<figure>
+<svg viewBox="0 0 760 250" role="img" aria-label="Project dependencies: Desktop references all projects; Connectors references Engine and Model; Engine references Model; Visuals references Charting and Model; Charting references Model.">
+<defs><marker id="a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L8,4 L0,8 z" class="head"/></marker></defs>
+<rect class="box" x="290" y="14" width="180" height="40" rx="5"/><text x="380" y="39" text-anchor="middle">Lumen.Desktop</text>
+<rect class="box" x="40" y="104" width="160" height="40" rx="5"/><text x="120" y="129" text-anchor="middle">Lumen.Connectors</text>
+<rect class="box" x="230" y="104" width="140" height="40" rx="5"/><text x="300" y="129" text-anchor="middle">Lumen.Engine</text>
+<rect class="box" x="400" y="104" width="140" height="40" rx="5"/><text x="470" y="129" text-anchor="middle">Lumen.Visuals</text>
+<rect class="box" x="570" y="104" width="150" height="40" rx="5"/><text x="645" y="129" text-anchor="middle">Lumen.Charting</text>
+<rect class="box" x="290" y="196" width="180" height="40" rx="5"/><text x="380" y="221" text-anchor="middle">Lumen.Model</text>
+<path class="ln" marker-end="url(#a)" d="M330,54 L140,104"/><path class="ln" marker-end="url(#a)" d="M360,54 L305,104"/><path class="ln" marker-end="url(#a)" d="M400,54 L465,104"/><path class="ln" marker-end="url(#a)" d="M440,54 L625,104"/>
+<path class="ln" marker-end="url(#a)" d="M200,124 L230,124"/><path class="ln" marker-end="url(#a)" d="M540,124 L570,124"/>
+<path class="ln" marker-end="url(#a)" d="M120,144 L320,196"/><path class="ln" marker-end="url(#a)" d="M300,144 L360,196"/><path class="ln" marker-end="url(#a)" d="M470,144 L400,196"/><path class="ln" marker-end="url(#a)" d="M645,144 L440,196"/>
+</svg>
+<figcaption>Project references. Desktop also references Model directly. Visuals never reference Engine.</figcaption>
+</figure>
+<table>
+<tr><th>Project</th><th>Key files</th><th>Holds</th><th>Packages</th></tr>
+<tr><td><code>Lumen.Model</code></td><td><code>Value.cs</code>, <code>Semantic.cs</code>, <code>Query.cs</code>, <code>Commands.cs</code></td><td>The <code>Value</code> struct, model and report definitions, query contract, command stack. No WPF.</td><td>Newtonsoft.Json</td></tr>
+<tr><td><code>Lumen.Engine</code></td><td><code>Columns.cs</code>, <code>Dataset.cs</code>, <code>FilterContext.cs</code>, <code>QueryEngine.cs</code>, <code>LqlParser.cs</code>, <code>LqlCompiler.cs</code></td><td>Column store, filter propagation, query execution, formula language.</td><td></td></tr>
+<tr><td><code>Lumen.Connectors</code></td><td><code>Connectors.cs</code>, <code>Transforms.cs</code>, <code>SampleData.cs</code></td><td>CSV, Excel, JSON and SQL readers; transform steps; relationship detection; sample data.</td><td>ExcelDataReader</td></tr>
+<tr><td><code>Lumen.Charting</code></td><td><code>Scales.cs</code></td><td>Scales, format strings, frozen brushes, geometry builders, <code>ChartHost</code>.</td><td></td></tr>
+<tr><td><code>Lumen.Visuals</code></td><td><code>Contracts.cs</code>, <code>Charts.cs</code>, <code>Grids.cs</code>, <code>Slicer.cs</code></td><td>The visual contract, format options, themes, registry, 14 visual types.</td><td></td></tr>
+<tr><td><code>Lumen.Reporting</code></td><td><code>ReportSession.cs</code>, <code>ReportSurface.cs</code>, <code>FiltersPane.cs</code>, <code>Exporter.cs</code>, <code>VirtualRows.cs</code>, <code>Ui.cs</code>, <code>Chrome.xaml</code></td><td>What any app that shows a report needs: session without undo, page surface, file format, filter pane, export, chrome styles.</td><td>PDFsharp-wpf</td></tr>
+<tr><td><code>Lumen.Desktop</code></td><td><code>Session.cs</code>, <code>ReportCanvas.cs</code>, <code>MainWindow.cs</code>, <code>Panes.cs</code>, <code>Views.cs</code>, <code>Dialogs.cs</code></td><td>The builder: undo, editing canvas, shell, panes, dialogs, self-checks.</td><td>AvalonEdit</td></tr>
+<tr><td><code>Lumen.Viewer</code></td><td><code>ViewerWindow.cs</code>, <code>ViewerCheck.cs</code></td><td>The read-only viewer and its self-check. Output is <code>LumenViewer.exe</code>.</td><td></td></tr>
+<tr><td><code>Lumen.Setup</code></td><td><code>Program.cs</code>, <code>SetupForm.cs</code>, <code>Installer.cs</code>, <code>Product.cs</code></td><td>The viewer installer, <code>LumenViewerSetup.exe</code>. It targets .NET 4.0 so that it can start without 4.7, reads the <code>Release</code> value under <code>NDP\v4\Full</code> (460798 is 4.7), and installs per user. Its build runs the viewer's build and embeds that output as resources named <code>payload/&lt;path&gt;</code>. <code>uninstall.exe</code> is a copy of setup, and <code>install.manifest</code> lists the files that uninstall may delete.</td><td></td></tr>
+<tr><td><code>Lumen.DesktopSetup</code></td><td><code>Product.cs</code></td><td>The Lumen installer, <code>LumenSetup.exe</code>, without the viewer. It compiles the other three files of <code>Lumen.Setup</code> as links; <code>Product.cs</code> holds the names, so the two installers register separately and can sit side by side.</td><td></td></tr>
+</table>
+
+<h2 id="flow">4. A slicer click, end to end</h2>
+<p>This path crosses every layer. Read the code in this order and the rest falls into place.</p>
+<figure>
+<svg viewBox="0 0 760 330" role="img" aria-label="Flow from slicer click through the canvas, query batch, engine and back to drawing">
+<defs><marker id="b" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L8,4 L0,8 z" class="head"/></marker></defs>
+<rect class="box" x="20" y="16" width="220" height="56" rx="5"/><text x="130" y="39" text-anchor="middle">SlicerVisual.OnBox</text><text x="130" y="58" text-anchor="middle">IVisualHost.SetSlicerFilter</text>
+<rect class="box" x="270" y="16" width="220" height="56" rx="5"/><text x="380" y="39" text-anchor="middle">ReportCanvas.Refresh(30 ms)</text><text x="380" y="58" text-anchor="middle">cancels the previous refresh</text>
+<rect class="box" x="520" y="16" width="220" height="56" rx="5"/><text x="630" y="39" text-anchor="middle">BuildQueries + ComposeFilters</text><text x="630" y="58" text-anchor="middle">UI thread, one spec per query</text>
+<rect class="box" x="520" y="124" width="220" height="56" rx="5"/><text x="630" y="147" text-anchor="middle">InProcessEngine batch</text><text x="630" y="166" text-anchor="middle">result cache lookup, then pool</text>
+<rect class="box" x="270" y="124" width="220" height="56" rx="5"/><text x="380" y="147" text-anchor="middle">QueryScope.Execute</text><text x="380" y="166" text-anchor="middle">masks, partition, measures</text>
+<rect class="box" x="20" y="124" width="220" height="56" rx="5"/><text x="130" y="147" text-anchor="middle">Dataset memo tables</text><text x="130" y="166" text-anchor="middle">shared filter masks, row maps</text>
+<rect class="box" x="270" y="232" width="220" height="56" rx="5"/><text x="380" y="255" text-anchor="middle">QueryResult (columnar)</text><text x="380" y="274" text-anchor="middle">totals, highlight, error</text>
+<rect class="box" x="520" y="232" width="220" height="56" rx="5"/><text x="630" y="255" text-anchor="middle">ILumenVisual.Update</text><text x="630" y="274" text-anchor="middle">UI thread, DrawingVisual layers</text>
+<path class="ln" marker-end="url(#b)" d="M240,44 L270,44"/><path class="ln" marker-end="url(#b)" d="M490,44 L520,44"/><path class="ln" marker-end="url(#b)" d="M630,72 L630,124"/><path class="ln" marker-end="url(#b)" d="M520,152 L490,152"/><path class="ln" marker-end="url(#b)" d="M270,152 L240,152"/><path class="ln" marker-end="url(#b)" d="M380,180 L380,232"/><path class="ln" marker-end="url(#b)" d="M490,260 L520,260"/>
+</svg>
+<figcaption>Slicer click to redraw. Only the middle row leaves the UI thread.</figcaption>
+</figure>
+<ol class="steps">
+<li><b>Publish.</b> The slicer builds a <code>FilterDef</code> and calls <code>IVisualHost.SetSlicerFilter</code>. The canvas stores it as <code>SlicerState</code> on the <code>VisualDef</code>. That is saved in the file, but it is not an undo step and doesn't mark the document dirty.</li>
+<li><b>Coalesce.</b> <code>ReportCanvas.Refresh(delay)</code> cancels the current <code>CancellationTokenSource</code> and waits 30 ms, so rapid clicks collapse into one run.</li>
+<li><b>Build.</b> For each visible visual, <code>BuildQueries</code> produces specs and <code>ComposeFilters</code> merges report, page, visual and slicer filters plus any cross-filter selection. A slicer skips its own filter. With Highlight mode, selection filters go in <code>QuerySpec.Highlight</code>.</li>
+<li><b>Execute.</b> The batch runs off the UI thread. Each spec checks the result cache, keyed by dataset version and spec JSON with filter ids stripped.</li>
+<li><b>Mask.</b> Each filter resolves to a row <code>Bitset</code> on the table it needs, memoized per filter in the dataset, so visuals in one refresh share work.</li>
+<li><b>Partition.</b> Rows that pass the mask are partitioned by group key once per query.</li>
+<li><b>Evaluate.</b> Compiled measures run per group over those partitions, in parallel across groups or row chunks.</li>
+<li><b>Draw.</b> Back on the UI thread, each container stores its results and calls <code>Update</code>. The Performance pane gets its text from the same pass.</li>
+</ol>
+
+<h2 id="model">5. Lumen.Model</h2>
+<h3>Value</h3>
+<p><code>Value</code> is a readonly struct holding a kind, an integer payload (also date ticks and booleans), a double and a string. Boxing is avoided, but the struct is large, so hot paths use typed arrays and meet <code>Value</code> only at the edges. <code>Value.Compare</code> defines the sort order, with BLANK first.</p>
+<h3>Semantic model and report</h3>
+<table>
+<tr><th>Type</th><th>Role</th></tr>
+<tr><td><code>SemanticModel</code></td><td><code>Tables</code>, <code>Measures</code>, <code>Relationships</code>.</td></tr>
+<tr><td><code>TableDef</code>, <code>ColumnDef</code></td><td>Metadata, the <code>DataSourceRef</code> and transform steps. No rows.</td></tr>
+<tr><td><code>MeasureDef</code></td><td>Name, LQL text, format, home table.</td></tr>
+<tr><td><code>RelationshipDef</code></td><td><code>From</code> is the many side, <code>To</code> the one side. The engine reads <code>IsActive</code> only; <code>Cardinality</code> is descriptive.</td></tr>
+<tr><td><code>ReportDocument</code></td><td><code>Pages</code>, <code>Model</code>, <code>Theme</code>, <code>ReportFilters</code>, <code>SchemaVersion</code>.</td></tr>
+<tr><td><code>VisualDef</code></td><td>Type key, bounds, <code>Roles</code> (well name to <code>FieldRef</code> list), <code>Format</code> (a <code>JObject</code> of overrides), filters, slicer state.</td></tr>
+<tr><td><code>FieldRef</code></td><td>A column or a measure, by id, with an optional aggregation. A column with an aggregation is an implicit measure.</td></tr>
+<tr><td><code>FilterDef</code></td><td>Basic, Advanced, TopN or RelativeDate over one column.</td></tr>
+</table>
+<h3>Query contract</h3>
+<p><code>QuerySpec</code> is the equivalent of one visual's <code>SUMMARIZECOLUMNS</code>: <code>GroupBy</code>, <code>Measures</code>, <code>Filters</code>, <code>Highlight</code>, <code>OrderBy</code>, <code>TopN</code>, <code>Limit</code> (default 3,500) and <code>IncludeTotals</code>. <code>QueryResult</code> is columnar, indexed <code>Data[column][row]</code>, group columns first. <code>RowKey(row)</code> joins the group labels with U+001F, which is how selections and highlights align across queries.</p>
+
+<h2 id="storage">6. Engine: column store</h2>
+<p><code>Columns.cs</code> holds the storage types.</p>
+<table>
+<tr><th>Type</th><th>Storage</th></tr>
+<tr><td><code>DoubleColumn</code></td><td><code>double[]</code> and a null bitmap. Also used for Decimal, which trades decimal exactness for tight loops.</td></tr>
+<tr><td><code>Int64Column</code></td><td><code>long[]</code> and a null bitmap.</td></tr>
+<tr><td><code>DateColumn</code></td><td>Ticks in a <code>long[]</code>.</td></tr>
+<tr><td><code>DictColumn</code></td><td><code>int</code> codes into a dictionary. Strings and booleans.</td></tr>
+</table>
+<p><b><code>Column.Encoded</code></b> lazily builds an <code>Encoding</code> for any column: a sorted dictionary, a code per row, and a representative row per code. Code 0 is always BLANK. This makes grouping, distinct counts and predicate evaluation uniform over all types. Predicates run once per dictionary entry, then filters test a lookup table per row.</p>
+<p><b><code>Bitset</code></b> is the filter representation: one bit per row, with word-at-a-time AND/OR and popcount.</p>
+<p><b><code>Par</code></b> is the parallel primitive. <code>Par.Ranges</code> and <code>Par.Sum</code> use fixed chunks of 65,536 rows. Two properties depend on that fixed size. It is a multiple of 64, so chunks never share a bitset word, and writes need no synchronization. And floating-point sums are deterministic, because the same chunks combine in the same order regardless of thread count.</p>
+<p><b><code>Dataset</code></b> is immutable once built: tables, resolved relationships, compiled measures and memo tables. Any model or data change makes a new one, which is the cache-invalidation story. <code>fkToDimRow</code> maps a fact row to its dimension row for each relationship. Orphan keys map to no row, and group as BLANK. A lazily built inverted <code>FkIndex</code> in CSR form maps a dimension row back to its fact rows.</p>
+
+<h2 id="filter">7. Engine: filters</h2>
+<p><code>FilterContext</code> is an immutable set of column filters. Applying one to a table walks the relationships from one side to many side. Direction is single only: a filter on a fact table doesn't reach a dimension.</p>
+<ol class="steps">
+<li><b>Same table.</b> Evaluate the predicate per dictionary code, then scan the codes into a mask.</li>
+<li><b>Across a relationship, wide filter.</b> Compute the dimension's row mask, then scan the fact table's <code>fkToDimRow</code> in parallel.</li>
+<li><b>Across a relationship, narrow filter.</b> When selected dimension rows times 8 is less than the dimension's length, and the fact table is larger than <code>Par.Chunk * 2</code>, use the inverted index and set bits directly. A single-month filter on a date table touches a small part of the fact table this way.</li>
+</ol>
+<p><b>Memoization.</b> Masks live in <code>Dataset.MaskMemo</code> and <code>RowMemo</code> as <code>Lazy</code> values, keyed by <code>"c:" + cf.Sig</code> or <code>"r:" + rel.Id + "=" + hash</code>, combined with the signature and table. <code>NoteMemo</code> caps them at 256 MB. Per-group contexts reuse masks, so a 40-bar chart doesn't rescan 40 times. A cancelled <code>Lazy</code> would cache its exception, so <code>QueryScope.Shared&lt;T&gt;</code> detects that and evicts it.</p>
+<p><b>TopN filters</b> apply last, through a nested query: rank the column by the measure, then filter to the winners.</p>
+
+<h2 id="query">8. Engine: query execution</h2>
+<p><code>QueryScope</code> lives for one query. It holds the partitions, the pooled buffers and the cancellation token.</p>
+<ol class="steps">
+<li><b>Driver.</b> <code>PickDriver</code> chooses the table to iterate. With measures it's the largest table that reaches all group tables. Without measures, as for a slicer, it's the smallest.</li>
+<li><b>Group keys.</b> Each group column contributes its dictionary codes to a mixed-radix integer key.</li>
+<li><b>Partition.</b> If the key space is at most <code>1 &lt;&lt; 20</code> a dense array counts rows per key. Otherwise a sparse map is used. Key buffers are pooled, with at most 4 held.</li>
+<li><b>Measures.</b> Each table a measure touches gets a <code>Lazy&lt;Partition&gt;</code>, and its <code>ProjectionMask</code> records which group columns that table sees. Aggregates reuse the partition instead of rescanning.</li>
+<li><b>Parallelism.</b> With at least 4 groups and a driver over <code>Par.Chunk * 2</code>, groups evaluate in parallel. Otherwise each aggregate can parallelize over chunks.</li>
+<li><b>Post-processing.</b> Groups whose measures are all BLANK are dropped. Sort honors <code>OrderBy</code>, then group display order, using sort-by columns. Then <code>TopN</code> and <code>Limit</code>.</li>
+<li><b>Totals and highlight.</b> Totals evaluate separately, so ratios are right. Highlight is a second <code>QueryScope</code> aligned by <code>RowKey</code>.</li>
+</ol>
+<p><b>Result cache.</b> <code>InProcessEngine</code> keeps results keyed by dataset version plus the spec's JSON, with filter <code>Id</code> values removed by regex, because each slicer click creates a new <code>FilterDef</code> id. Up to 4,000 entries. A hit returns the same <code>QueryResult</code> instance, so treat results as immutable.</p>
+
+<h2 id="lql">9. LQL: parser and compiler</h2>
+<h3>Parser</h3>
+<p><code>LqlParser.cs</code> is a hand-written lexer and Pratt parser. Binding powers: <code>||</code> 1, <code>&amp;&amp;</code> 2, comparisons and <code>IN</code> 3, <code>&amp;</code> 4, <code>+ -</code> 5, <code>* /</code> 6, <code>^</code> 7 right-associative, unary 8. Unary above <code>^</code> differs from DAX, so <code>-2^2</code> is 4. Errors carry position as <code>LqlDiagnostic</code> (line, column, offset, length), which the editor's squiggle uses.</p>
+<h3>Compiler</h3>
+<p><code>LqlCompiler</code> compiles the AST to a closure tree, not IL:</p>
+<pre><code>public delegate Value Eval(EvalCtx c);          // scalar expression
+internal delegate double RowFn(int row);        // row kernel, no Value
+internal delegate int[] TableEval(EvalCtx c);   // table expression
+internal delegate FilterContext Modifier(EvalCtx outer, FilterContext f);  // CALCULATE argument</code></pre>
+<ul>
+<li><code>EvalCtx</code> carries the filter context, the row context and variables.</li>
+<li><code>Scope</code> is the compile-time binder for variables and row-context tables.</li>
+<li>Measures compile once per <code>Dataset</code>. A <code>[ThreadStatic]</code> in-flight set detects self-reference.</li>
+<li><code>RowFn</code> kernels: <code>SUMX</code> over <code>+ - *</code> of numeric columns compiles to a typed row function, which runs in parallel with no <code>Value</code> churn. Anything else falls back to row-by-row <code>Eval</code>.</li>
+<li><code>CompiledTable</code> records <code>TableId</code>, <code>ColumnId</code>, <code>Rows</code> and <code>Modify</code>, so that one compiled table expression can act as iterator input or as a <code>CALCULATE</code> filter.</li>
+<li><code>CALCULATE</code> boolean predicates must use exactly one column, and are evaluated once per dictionary code, then cached.</li>
+<li><code>RELATED</code> goes through <code>fkToDimRow</code>. Time intelligence requires a table with <code>DateTableColumnId</code> set.</li>
+</ul>
+<h3>Semantic differences that matter</h3>
+<ul>
+<li><b>No context transition.</b> <code>CALCULATE</code> or a measure inside an iterator doesn't convert the row context into filters. This is the largest gap from DAX.</li>
+<li><code>/</code> follows IEEE doubles (Infinity, NaN). <code>DIVIDE</code> returns BLANK or the alternate.</li>
+<li>BLANK behaves as zero in <code>+</code> and <code>-</code>, as in DAX.</li>
+<li><code>COUNT</code> and <code>COUNTA</code> are the same aggregate here. <code>VALUES</code> is <code>DISTINCT</code>.</li>
+<li><code>MIN</code> and <code>MAX</code> also accept two scalar arguments.</li>
+<li><code>FORMAT</code> takes .NET format strings.</li>
+<li><code>DATESYTD</code> and <code>SAMEPERIODLASTYEAR</code> replace all filters on the date table.</li>
+</ul>
+
+<h2 id="conn">10. Connectors and transforms</h2>
+<p><code>ColumnBatch</code> is the interchange type: columns with names and types, not yet bound to model ids. The pipeline is <code>ReadSource</code> to <code>ApplySteps</code> to <code>Bind</code>:</p>
+<pre><code>public static ColumnBatch ReadSource(DataSourceRef src, CancellationToken ct)
+{
+    switch (src.Kind) {
+        case "csv":    return CsvConnector.Read(src.Path, src.HasHeaders, ct);
+        case "excel":  return ExcelConnector.Read(src.Path, src.Sheet, src.HasHeaders, ct);
+        case "json":   return JsonConnector.Read(src.Path, ct);
+        case "sql":    return SqlConnector.Read(src.ConnectionString, src.Query, ct);
+        case "sample": return SampleData.Batch(src.Query, 50000);
+        ...</code></pre>
+<ul>
+<li><b>Type inference</b> tries Int64, Double, Boolean, Date (length 8 or more), then String.</li>
+<li><b>CSV</b> is hand-written; the delimiter comes from the first line.</li>
+<li><b>SQL.</b> Text starting with <code>select</code> or <code>with</code> passes through; anything else is treated as a table name and goes through <code>QuoteName</code>. <code>CommandTimeout</code> is 300 seconds. <code>DatabasesAsync</code> serves the dialog's database list.</li>
+<li><b>Transforms.</b> <code>TransformStepDef</code> is data (<code>Kind</code>, <code>Label</code>, string <code>Args</code>), and <code>TransformEngine.Apply</code> switches on <code>Kind</code>. Each step takes and returns a <code>ColumnBatch</code>.</li>
+<li><b><code>AddCustomColumn</code></b> compiles an LQL expression against a throwaway dataset of the batch.</li>
+<li><b><code>DetectRelationships</code></b> requires the same name and type, one side all-distinct with no blanks, and the many side at least as long.</li>
+</ul>
+
+<h2 id="visual">11. Charting and visuals</h2>
+<h3>Contract</h3>
+<pre><code>public interface ILumenVisual : IDisposable
+{
+    VisualCapabilities Capabilities { get; }
+    FrameworkElement CreateView(IVisualHost host);
+    IReadOnlyList&lt;QuerySpec&gt; BuildQueries(VisualDef def, SemanticModel model);  // UI thread, no data access
+    void Update(VisualUpdate update);                                           // UI thread
+}</code></pre>
+<p><code>IVisualHost</code> is the only way out of a visual: <code>Select</code>, <code>ClearSelection</code>, <code>ShowTooltip</code>, <code>HideTooltip</code>, <code>ColorFor</code>, <code>SetSlicerFilter</code>. Returning no queries from <code>BuildQueries</code> means the wells are incomplete.</p>
+<h3>Drawing</h3>
+<p><code>ChartHost</code> is a <code>FrameworkElement</code> holding four <code>DrawingVisual</code> layers: <code>GridLayer</code>, <code>MarksLayer</code>, <code>AxesLayer</code>, <code>OverlayLayer</code>. Brushes and pens are frozen (<code>Frozen.Brush</code>, <code>Frozen.Pen</code>), and geometry is frozen <code>StreamGeometry</code> from <code>ShapeBuilders</code>. Frozen objects are cheaper to render, and safe to share.</p>
+<p><code>ChartVisual</code> is the base class. It handles empty and error states, routes the mouse through <code>Marks</code>, and calls your <code>Render()</code>. A <code>Mark</code> is a plain object: a <code>Rect</code> or <code>Geometry</code> for hit testing, a <code>DataPoint</code> and tooltip lines. Hit testing walks the list backward, since later marks paint on top.</p>
+<h3>Cross-cutting behavior</h3>
+<ul>
+<li><b>Highlight.</b> When <code>Capabilities.SupportsHighlight</code> is false, the canvas sends the selection as a filter.</li>
+<li><b>Colors.</b> <code>Session.ColorFor</code> assigns theme colors by first seen, so a name keeps its color across a page.</li>
+<li><b>Format.</b> A format class is a POCO with <code>[FormatCard]</code> and <code>[FormatProperty]</code> attributes. <code>VisualizationsPane.BuildFormat</code> generates its editors by reflection. <code>VisualDef.Format</code> stores overrides only, and <code>VisualRegistry.ReadFormat</code> applies them over class defaults.</li>
+<li><b>Tables</b> sort on the client, over returned rows only. <b>Matrix</b> sends one query per subtotal depth, each with and without the column group, so subtotals are true evaluations.</li>
+<li><b>Slicers</b> rebuild their controls only when style or field changes, and <code>_updating</code> stops control updates from publishing filters.</li>
+</ul>
+
+<h2 id="shell">12. Desktop shell</h2>
+<table>
+<tr><th>Class</th><th>Job</th></tr>
+<tr><td><code>ReportSession</code></td><td>In <code>Lumen.Reporting</code>. Owns <code>Doc</code>, <code>Engine</code>, <code>Tables</code> and <code>Theme</code>. Its virtual <code>Edit</code> applies a change in memory with no history. The viewer uses it directly.</td></tr>
+<tr><td><code>Session</code></td><td>Derives from <code>ReportSession</code> and adds <code>Stack</code>. All edits go through <code>Edit</code>. Raises <code>Changed</code> with a data-affecting flag.</td></tr>
+<tr><td><code>ThemeService</code></td><td>Writes brushes into <code>Application.Resources</code>: <code>ChromeBg</code>, <code>PanelBg</code>, <code>ChromeFg</code>, <code>ChromeFg2</code>, <code>CanvasBg</code>, <code>Accent</code>, <code>AccentFg</code>, <code>Line</code>. Chrome uses <code>SetResourceReference</code>, so it restyles in place.</td></tr>
+<tr><td><code>ReportSurface</code></td><td>In <code>Lumen.Reporting</code>. Page surface: <code>Sync</code> reconciles containers by id, plus zoom, slicers, cross-filter state, the refresh loop, tooltips and focus mode. It changes only slicer state, so on its own it is a read-only viewer.</td></tr>
+<tr><td><code>ReportCanvas</code></td><td>Derives from <code>ReportSurface</code> through its virtual hooks, and adds selection, drag, resize, smart guides, rubber band and arrange commands.</td></tr>
+<tr><td><code>VisualContainer</code></td><td>In <code>Lumen.Reporting</code>. Frame, title and context menu for a visual. Implements <code>IVisualHost</code> explicitly. <code>EditableVisualContainer</code> in the builder adds the selection frame, handles and interaction buttons.</td></tr>
+<tr><td><code>ViewerWindow</code></td><td>The viewer's shell. It holds a <code>ReportSession</code> and a <code>ReportSurface</code>, and never calls <code>LumenFile.Save</code>. Reader choices live in memory; Reset reads them back from a JSON snapshot taken at open. Refresh looks for a missing source file beside the report, in memory only.</td></tr>
+<tr><td><code>MainWindow</code></td><td>Ribbon, rail, layout, keys, file commands, import, export and self-checks.</td></tr>
+<tr><td><code>Panes.cs</code></td><td><code>FieldsPane</code>, <code>VisualizationsPane</code>, <code>FiltersPane</code>, <code>SelectionPane</code>, <code>PerformancePane</code>.</td></tr>
+<tr><td><code>Views.cs</code></td><td><code>DataView</code> (virtual grid), <code>ModelView</code> (diagram). <code>VirtualRows</code> implements non-generic <code>IList</code> for row virtualization without row objects.</td></tr>
+<tr><td><code>Dialogs.cs</code></td><td><code>Prompt</code>, <code>SqlDialog</code>, <code>TransformWindow</code>, <code>MeasureWindow</code> (AvalonEdit, highlighting from embedded <code>Lql.xshd</code>), <code>Exporter</code>.</td></tr>
+</table>
+<p><b>Change routing.</b> <code>OnChanged(dataAffecting)</code> decides the scope: a layout change only re-places containers and redraws, while a data-affecting change requeries and rebuilds panes. <code>Session.AfterChange</code> compares model JSON to decide whether the <code>Dataset</code> must be rebuilt.</p>
+
+<h2 id="undo">13. Undo model</h2>
+<p><code>CommandStack</code> holds <code>IReportCommand</code>s. There are two kinds:</p>
+<ul>
+<li><b>Snapshot.</b> <code>Session.Edit(label, action)</code> serializes the document, runs the action, and serializes again. Undo restores the before JSON into the same <code>Doc</code> instance. It's simple and universal, and costs a document's JSON per step, which is small since rows aren't in it.</li>
+<li><b><code>SetBoundsCommand</code></b> handles drags. Commands with the same gesture id merge, so a drag is one step. Moves write straight to definitions during the gesture, and <code>RecordBounds</code> records them afterward without re-running them.</li>
+</ul>
+<div class="warn"><p>After an undo, <code>VisualDef</code> objects are new instances. Never hold one across an edit. <code>VisualContainer.Def</code> looks the current one up by id for this reason. <code>Session.Tables</code> is outside undo: undoing an import removes the table from the model, and the rows stay in the dictionary.</p></div>
+
+<h2 id="file">14. The .lumen format</h2>
+<p>A ZIP archive:</p>
+<table>
+<tr><th>Entry</th><th>Content</th></tr>
+<tr><td><code>report.json</code></td><td>The <code>ReportDocument</code>, without the model.</td></tr>
+<tr><td><code>model.json</code></td><td>The <code>SemanticModel</code>.</td></tr>
+<tr><td><code>data/&lt;tableId&gt;.col</code></td><td>Column count, then for each column its id and the <code>ColumnIO</code> payload. Binary.</td></tr>
+<tr><td><code>thumbnails/page1.png</code></td><td>Preview of the current page at save. Skipped by autosave.</td></tr>
+</table>
+<p><code>LumenFile.Save</code> writes to a <code>.tmp</code> file, then deletes the target and moves the temp file into place. A crash between those two leaves only the <code>.tmp</code>, so it isn't fully atomic. <code>File.Replace</code> would close that window. <code>Open</code> refuses a <code>SchemaVersion</code> above 1, and a missing data entry leaves that table out, so its visuals report a missing field.</p>
+<div class="warn"><p>A report file is executable in one sense: SQL text and the connection string in it run on Refresh. Connection strings use Integrated Security and contain no passwords.</p></div>
+
+<h2 id="recipes">15. Extension recipes</h2>
+<h3>Add a visual</h3>
+<ol class="steps">
+<li>Subclass <code>ChartVisual</code>, or <code>CartesianVisual</code> if it has axes.</li>
+<li>Register it in <code>VisualRegistry.Factories</code>. Keys are stored in files, so never rename one.</li>
+<li><b>Add an icon to <code>Ui.VisualIcons</code> in <code>Panes.cs</code>.</b> The gallery and the Insert tab index that dictionary directly, so a missing key throws at startup.</li>
+</ol>
+<pre><code>public sealed class BulletVisual : ChartVisual
+{
+    public override VisualCapabilities Capabilities => new VisualCapabilities
+    {
+        DisplayName = "Bullet",
+        FormatType = typeof(ChartFormat),
+        Roles =
+        {
+            new DataRole("values", "Value", RoleKind.Measure, 1, 1),
+            new DataRole("target", "Target", RoleKind.Measure, 1, 1)
+        }
+    };
+
+    protected override void Render()
+    {
+        // Measures arrive in well order, so 0 is the value and 1 the target.
+        double value = U.Data.Measure(0, 0).AsDouble();
+        double target = U.Data.Measure(1, 0).AsDouble();
+        double scale = U.Size.Width / Math.Max(1, Math.Max(value, target));
+        var bar = new Rect(0, 20, value * scale, 24);
+
+        using (var dc = Chart.MarksLayer.RenderOpen())
+            dc.DrawRectangle(Frozen.Brush(Host.ColorFor("value")), null, bar);
+
+        Marks.Add(new Mark
+        {
+            Bounds = bar,
+            Tip = new List&lt;TooltipItem&gt; { new TooltipItem("Value", value.ToString("#,0")) }
+        });
+    }
+}
+
+// VisualRegistry.Factories
+{ "bullet", () => new BulletVisual() },
+
+// Ui.VisualIcons: a 16 by 16 path
+{ "bullet", "M1,6h14v4H1z" },</code></pre>
+<p>Override <code>BuildQueries</code> only if the default doesn't fit. The default in <code>ChartVisual</code> turns Grouping wells into <code>GroupBy</code> and the others into measures, in one spec.</p>
+
+<h3>Add an LQL function</h3>
+<ol class="steps">
+<li>Add a <code>case</code> to <code>CompileCall</code> in <code>LqlCompiler.cs</code>. Use <code>Arity</code> for argument counts.</li>
+<li>Add it to <code>MeasureWindow.Functions</code> for completion.</li>
+<li>Add it to <code>Lql.xshd</code> for highlighting.</li>
+<li>Add a test with a value computed independently.</li>
+</ol>
+<pre><code>case "SQRT":  return Numeric(n, s, Math.Sqrt);   // existing
+case "LOG10": return Numeric(n, s, Math.Log10);  // new</code></pre>
+
+<h3>Add a data source</h3>
+<ol class="steps">
+<li>Write a reader that returns a <code>ColumnBatch</code>, honors the <code>CancellationToken</code>, and uses the builders in <code>Columns.cs</code>. <code>TypeInference</code> handles text sources.</li>
+<li>Add a <code>case</code> to <code>TableLoader.ReadSource</code>.</li>
+<li>Add a menu item with <code>gi(...)</code> in <code>MainWindow.BuildRibbon</code>, and call <code>ImportSource</code> with a <code>DataSourceRef</code> of your kind.</li>
+</ol>
+
+<h3>Add a transform step</h3>
+<ol class="steps">
+<li>Add a constant to <code>StepKinds</code>.</li>
+<li>Add a <code>case</code> to <code>TransformEngine.Apply</code>. Read arguments from the step, and return a new <code>ColumnBatch</code>.</li>
+<li>Add a button in <code>TransformWindow</code> that calls <code>Add(StepKinds.Create(kind, label, "key", value, ...))</code>.</li>
+</ol>
+
+<h3>Add a format option</h3>
+<p>Add an attributed property to the format class and read it in <code>Render</code>. The editor appears automatically, and old files keep the default.</p>
+<pre><code>[FormatCard("Legend"), FormatProperty("Font size", Min = 8, Max = 24)]
+public double LegendFontSize { get; set; } = 11;</code></pre>
+
+<h2 id="tests">16. Tests and self-checks</h2>
+<p><code>tests/Lumen.Engine.Tests</code> has 24 xUnit tests, all passing. Expected values come from a plain LINQ walk over the same rows, so the engine isn't checked against itself. Two fixtures exist: 20,000 rows for the serial paths, and 400,000 rows to cross the parallel threshold of <code>Par.Chunk * 2</code>. Anything that branches on size needs a test on the large fixture.</p>
+<p>Coverage is engine, LQL, CSV, transforms, column serialization and the command stack. UI is covered by the <code>--screenshot</code> self-check, not by unit tests.</p>
+<h3>The --screenshot self-check</h3>
+<p><code>MainWindow.RunScreenshot</code> drives the real shell: all sample pages, cross-highlight, slicer, undo, each visual selected, every visual type, copy, paste and align, CSV and JSON import, measure, transform and SQL windows, SQL import, save and reopen, Dark and High contrast, and PDF. If the machine has been idle for 30 seconds, <code>RealInputCheck</code> injects real mouse input with <code>mouse_event</code> to test OLE drag and drop and canvas gestures, since WPF's drag loop ignores simulated events. Unhandled exceptions are collected in <code>App.Failures</code>, and fail the run.</p>
+<p>The SQL portion expects local SQL Server instances, which are specific to the development machine. Its failures should be read accordingly.</p>
+<h3>What has not been exercised</h3>
+<p>These paths exist but were not run: Excel import, printing, Power BI theme import, clicking through Edit interactions, crash recovery, and opening the database drop-down with a real mouse (the list itself was tested). Check them first when something looks wrong there.</p>
+
+<h2 id="perf">17. Measured performance</h2>
+<p>Measured with <code>--bench 10000000</code> on an i7-13650HX with 64 GB, Release build, with the sample report's first page. Times include the 30 ms coalescing delay.</p>
+<table>
+<tr><th>Metric</th><th>Result</th><th>PRD target</th><th>Status</th></tr>
+<tr><td>Slicer to redraw, new filter</td><td>median 124 ms, p95 159 ms</td><td>under 100 ms p95</td><td>Missed</td></tr>
+<tr><td>Slicer to redraw, repeated filter</td><td>p95 49 ms</td><td>under 100 ms p95</td><td>Met</td></tr>
+<tr><td>First page ready</td><td>645 ms</td><td></td><td></td></tr>
+<tr><td>Dataset built</td><td>1.0 s</td><td></td><td></td></tr>
+<tr><td>Managed memory, live</td><td>941 MB</td><td></td><td></td></tr>
+<tr><td>Working set</td><td>1,666 MB; peak 4,055 MB</td><td>under 1.5 GB at 10 columns</td><td>Missed</td></tr>
+</table>
+<p>Neither miss has been profiled, so these are starting guesses. Peak memory probably comes from encodings, indexes and builders alive together during load. New-filter time probably sits in mask and partition building, so reusing partitions across similar filters is worth testing first.</p>
+
+<h2 id="gaps">18. Known gaps and traps</h2>
+<h3>Unused or partial</h3>
+<table>
+<tr><th>Item</th><th>State</th></tr>
+<tr><td><code>FieldKind.HierarchyLevel</code>, <code>ColumnDef.Expression</code>, <code>CrossFilter.Both</code>, <code>DisplayFolder</code>, <code>QueryResult.FromCache</code></td><td>Declared, not used.</td></tr>
+<tr><td>Inactive relationships</td><td>Ignored. There is no <code>USERELATIONSHIP</code>.</td></tr>
+<tr><td><code>Cardinality</code></td><td>Descriptive only.</td></tr>
+<tr><td>Calculated model columns</td><td>Not implemented. <code>AddCustomColumn</code> is the substitute.</td></tr>
+<tr><td>Measure-target filters</td><td>Not implemented.</td></tr>
+<tr><td><code>Dispose</code> on visuals</td><td>No-ops. <code>SelectionPane</code> and others don't call it everywhere.</td></tr>
+<tr><td><code>CheckGallery</code> role <code>"series"</code></td><td>Names no real role, so the check doesn't fill legends. Should be <code>"legend"</code>.</td></tr>
+</table>
+<h3>Traps</h3>
+<ul>
+<li><b>Results are shared.</b> The cache returns the same instance to every caller. Don't mutate a <code>QueryResult</code>.</li>
+<li><b>UI-thread queries.</b> <code>FiltersPane.BasicEditor</code> runs one synchronously.</li>
+<li><b>Autosave is synchronous,</b> so a large model pauses the UI every 2 minutes while dirty.</li>
+<li><b>Relative date filters</b> resolve "today" when the query runs, but cached results can outlive midnight.</li>
+<li><b>Deleting a table</b> leaves visuals pointing at it. They report a missing field by design.</li>
+<li><b>Between slicer</b> detects its first build from <code>Slider</code> default values.</li>
+<li><b>Table sort</b> is client-side, over at most 3,500 rows, so a truncated result sorts the truncated set.</li>
+<li><b>Cross-filter with several columns</b> becomes per-column filters, not tuple matches, so selecting (A, 1) and (B, 2) also matches (A, 2).</li>
+<li><b>Name clashes.</b> <code>Lumen.Engine.Encoding</code> clashes with <code>System.Text.Encoding</code>, and <code>Lumen.Model.Condition</code> with <code>System.Windows.Condition</code>. Qualify them.</li>
+<li><b>Build warning.</b> <code>MainWindow.Icon(string, double)</code> hides <code>Window.Icon</code> (CS0108). It's harmless.</li>
+</ul>
+
+<h2 id="prd">19. Differences from the PRD</h2>
+<table>
+<tr><th>PRD</th><th>Here</th><th>Why</th></tr>
+<tr><td>AvalonDock, Prism, Autofac, Serilog, System.Reactive, MEF</td><td>Grid splitters, tabs, plain classes, a static registry</td><td>Fewer dependencies for an MVP with one shell.</td></tr>
+<tr><td>CsvHelper</td><td>Hand-written reader</td><td>Direct control of allocation and type inference.</td></tr>
+<tr><td>RibbonWindow</td><td>Plain <code>Window</code> holding a <code>Ribbon</code></td><td>The ribbon stays light in dark themes.</td></tr>
+<tr><td><code>TimeScale</code>, mark animation</td><td>Band and linear scales, no animation</td><td>Out of MVP need.</td></tr>
+<tr><td>Date as days, Decimal as <code>decimal</code></td><td>Date as ticks, Decimal as <code>double</code></td><td>Uniform typed loops.</td></tr>
+<tr><td><code>TransformStepDef</code> subclasses</td><td>Data with <code>Kind</code> and <code>Args</code></td><td>Simple JSON and replay.</td></tr>
+</table>
+<footer>Lumen developer manual. End users: see <a href="UserPowerClone.html">UserPowerClone.html</a>. Further detail is in the XML doc and inline comments in the source.</footer>
+</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The installer for the Lumen builder. It compiles the code of Lumen.Setup with its own Product.cs, and embeds Lumen.Desktop instead of the viewer. It targets .NET 4.0 for the same reason: to start without 4.7 and say what is missing. -->
+  <PropertyGroup>
+    <TargetFramework>net40</TargetFramework>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>LumenSetup</AssemblyName>
+    <RootNamespace>Lumen.Setup</RootNamespace>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <ApplicationManifest>..\Lumen.Setup\app.manifest</ApplicationManifest>
+    <StartupObject>Lumen.Setup.Program</StartupObject>
+    <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="Microsoft.CSharp" />
+    <Compile Include="..\Lumen.Setup\Installer.cs" Link="Installer.cs" />
+    <Compile Include="..\Lumen.Setup\Program.cs" Link="Program.cs" />
+    <Compile Include="..\Lumen.Setup\SetupForm.cs" Link="SetupForm.cs" />
+  </ItemGroup>
+
+  <!-- Restores and builds Lumen, then embeds its output as one resource per file, named payload/<relative path>. Symbols stay out.
+       The restore has its own property so that MSBuild evaluates the project afresh for the build, with the restored packages. -->
+  <Target Name="EmbedApp" BeforeTargets="BeforeBuild">
+    <MSBuild Projects="..\Lumen.Desktop\Lumen.Desktop.csproj" Targets="Restore" Properties="Configuration=$(Configuration);MSBuildRestoreSessionId=$([System.Guid]::NewGuid())" />
+    <MSBuild Projects="..\Lumen.Desktop\Lumen.Desktop.csproj" Properties="Configuration=$(Configuration)" />
+    <PropertyGroup>
+      <AppOut>..\Lumen.Desktop\bin\$(Configuration)\</AppOut>
+    </PropertyGroup>
+    <ItemGroup>
+      <AppFile Include="$(AppOut)**\*" Exclude="$(AppOut)**\*.pdb" />
+      <EmbeddedResource Include="@(AppFile)" LogicalName="payload/%(RecursiveDir)%(Filename)%(Extension)" Type="Non-Resx" WithCulture="false" />
+    </ItemGroup>
+  </Target>
+</Project>

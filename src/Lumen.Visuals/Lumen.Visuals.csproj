@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Lumen.Model\Lumen.Model.csproj" />
+    <ProjectReference Include="..\Lumen.Charting\Lumen.Charting.csproj" />
+  </ItemGroup>
+</Project>

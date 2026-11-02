@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>Lumen</AssemblyName>
+    <RootNamespace>Lumen.Desktop</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <StartupObject>Lumen.Desktop.App</StartupObject>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Lumen.Model\Lumen.Model.csproj" />
+    <ProjectReference Include="..\Lumen.Engine\Lumen.Engine.csproj" />
+    <ProjectReference Include="..\Lumen.Connectors\Lumen.Connectors.csproj" />
+    <ProjectReference Include="..\Lumen.Charting\Lumen.Charting.csproj" />
+    <ProjectReference Include="..\Lumen.Visuals\Lumen.Visuals.csproj" />
+    <ProjectReference Include="..\Lumen.Reporting\Lumen.Reporting.csproj" />
+    <PackageReference Include="AvalonEdit" Version="6.1.3.50" />
+    <Reference Include="System.Windows.Controls.Ribbon" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Lql.xshd" />
+  </ItemGroup>
+</Project>

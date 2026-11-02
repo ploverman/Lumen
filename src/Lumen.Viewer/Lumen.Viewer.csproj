@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>LumenViewer</AssemblyName>
+    <RootNamespace>Lumen.Viewer</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <StartupObject>Lumen.Viewer.App</StartupObject>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Lumen.Model\Lumen.Model.csproj" />
+    <ProjectReference Include="..\Lumen.Engine\Lumen.Engine.csproj" />
+    <ProjectReference Include="..\Lumen.Connectors\Lumen.Connectors.csproj" />
+    <ProjectReference Include="..\Lumen.Charting\Lumen.Charting.csproj" />
+    <ProjectReference Include="..\Lumen.Visuals\Lumen.Visuals.csproj" />
+    <ProjectReference Include="..\Lumen.Reporting\Lumen.Reporting.csproj" />
+  </ItemGroup>
+</Project>

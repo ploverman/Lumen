@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The installer targets .NET 4.0, below the viewer's 4.7, so that it can start on a machine without 4.7 and say what is missing. -->
+  <PropertyGroup>
+    <TargetFramework>net40</TargetFramework>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>LumenViewerSetup</AssemblyName>
+    <RootNamespace>Lumen.Setup</RootNamespace>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <StartupObject>Lumen.Setup.Program</StartupObject>
+    <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="Microsoft.CSharp" />
+  </ItemGroup>
+
+  <!-- Restores and builds the viewer, then embeds its output as one resource per file, named payload/<relative path>. Symbols stay out.
+       The restore has its own property so that MSBuild evaluates the project afresh for the build, with the restored packages. -->
+  <Target Name="EmbedViewer" BeforeTargets="BeforeBuild">
+    <MSBuild Projects="..\Lumen.Viewer\Lumen.Viewer.csproj" Targets="Restore" Properties="Configuration=$(Configuration);MSBuildRestoreSessionId=$([System.Guid]::NewGuid())" />
+    <MSBuild Projects="..\Lumen.Viewer\Lumen.Viewer.csproj" Properties="Configuration=$(Configuration)" />
+    <PropertyGroup>
+      <ViewerOut>..\Lumen.Viewer\bin\$(Configuration)\</ViewerOut>
+    </PropertyGroup>
+    <ItemGroup>
+      <ViewerFile Include="$(ViewerOut)**\*" Exclude="$(ViewerOut)**\*.pdb" />
+      <EmbeddedResource Include="@(ViewerFile)" LogicalName="payload/%(RecursiveDir)%(Filename)%(Extension)" Type="Non-Resx" WithCulture="false" />
+    </ItemGroup>
+  </Target>
+</Project>

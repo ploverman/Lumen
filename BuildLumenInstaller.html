@@ -1,0 +1,819 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Building the Lumen Installer</title>
+<style>:root{--bg:#fff;--fg:#1f2328;--muted:#59636e;--line:#d8dee4;--panel:#f6f8fa;--accent:#0f6cbd;--note:#eaf3fb;--warn:#fff4e0;--warn-line:#c77700;--code:#f2f4f7}
+@media (prefers-color-scheme:dark){:root{--bg:#16181c;--fg:#e6e8eb;--muted:#a3abb5;--line:#343a42;--panel:#1e2126;--accent:#6cb4f5;--note:#17293a;--warn:#33270f;--warn-line:#e0a030;--code:#23272d}}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:12px}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 "Segoe UI",system-ui,sans-serif}
+.layout{display:grid;grid-template-columns:290px minmax(0,1fr);max-width:1400px;margin:0 auto}
+nav.toc{position:sticky;top:0;align-self:start;height:100vh;overflow:auto;padding:24px 16px 24px 24px;border-right:1px solid var(--line);font-size:14px}
+nav.toc .brand{font-weight:600;font-size:18px;margin-bottom:2px}
+nav.toc .sub{color:var(--muted);font-size:13px;margin-bottom:14px}
+nav.toc ol{list-style:none;margin:0;padding:0}
+nav.toc a{display:block;padding:4px 8px;border-radius:5px;color:var(--fg);text-decoration:none}
+nav.toc a:hover{background:var(--panel);color:var(--accent)}
+main{padding:32px 48px 80px;min-width:0;max-width:980px}
+h1{font-size:34px;line-height:1.2;margin:0 0 8px}
+h2{font-size:25px;line-height:1.3;margin:52px 0 12px;padding-top:12px;border-top:1px solid var(--line)}
+h3{font-size:19px;margin:30px 0 8px}
+.lead{font-size:18px;color:var(--muted);margin:0 0 20px}
+a{color:var(--accent)}
+code,pre{font-family:Consolas,"Cascadia Mono",monospace;font-size:.92em}
+code{background:var(--code);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+pre{background:var(--code);padding:12px 14px;border-radius:6px;overflow:auto;line-height:1.45;border:1px solid var(--line)}
+pre code{background:none;padding:0;overflow-wrap:normal}
+details{margin:14px 0}
+summary{cursor:pointer;font-weight:600}
+table{border-collapse:collapse;width:100%;margin:14px 0;font-size:15px;display:block;overflow-x:auto}
+th,td{border:1px solid var(--line);padding:6px 10px;text-align:left;vertical-align:top}
+th{background:var(--panel);font-weight:600}
+.note,.warn{padding:10px 14px;border-radius:6px;margin:14px 0;border-left:4px solid var(--accent);background:var(--note)}
+.warn{border-left-color:var(--warn-line);background:var(--warn)}
+.note>:first-child,.warn>:first-child{margin-top:0}.note>:last-child,.warn>:last-child{margin-bottom:0}
+footer{margin-top:60px;padding-top:14px;border-top:1px solid var(--line);color:var(--muted);font-size:14px}
+@media (max-width:900px){.layout{display:block}nav.toc{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line);padding:16px}main{padding:20px 16px 60px}h1{font-size:28px}}
+@media print{nav.toc{display:none}.layout{display:block}main{max-width:none;padding:0}h2{break-after:avoid}table{break-inside:avoid}details>*{display:block}}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc">
+<div class="brand">Lumen Installer</div>
+<div class="sub">Step by step build guide</div>
+<ol>
+<li><a href="#overview">Overview</a></li>
+<li><a href="#need">What you need</a></li>
+<li><a href="#s1">Step 1: Create the folders</a></li>
+<li><a href="#s2">Step 2: Add the manifest</a></li>
+<li><a href="#s3">Step 3: Describe the product</a></li>
+<li><a href="#s4">Step 4: Write the install logic</a></li>
+<li><a href="#s5">Step 5: Write the entry point</a></li>
+<li><a href="#s6">Step 6: Write the setup window</a></li>
+<li><a href="#s7">Step 7: Write the project file</a></li>
+<li><a href="#s8">Step 8: Add it to the solution</a></li>
+<li><a href="#s9">Step 9: Build</a></li>
+<li><a href="#s10">Step 10: Confirm the contents</a></li>
+<li><a href="#s11">Step 11: Test it</a></li>
+<li><a href="#s12">Step 12: Distribute it</a></li>
+<li><a href="#trouble">Troubleshooting</a></li>
+</ol>
+</nav>
+<main>
+<h1>Building the Lumen Installer</h1>
+<p class="lead">How to create <code>LumenSetup.exe</code>, a single-file installer for the Lumen app that does not include Lumen Viewer. No installer framework is involved: it is a small C# program with the app embedded as resources.</p>
+
+<div class="note"><p><b>Already have the current source tree?</b> Steps 1 to 8 are done there, so go to <a href="#s9">Step 9</a>. The earlier steps show every file and explain it, so you can recreate or change the installer. The listings on this page are the actual source files.</p></div>
+
+<h2 id="overview">Overview</h2>
+<p>The result is one exe. When it runs, it checks for .NET Framework 4.7, shows a window, copies the embedded Lumen files to a per-user folder, and registers the app with Windows. It also copies itself into that folder as <code>uninstall.exe</code>.</p>
+
+<h3>Design decisions</h3>
+<table>
+<tr><th>Decision</th><th>Why</th></tr>
+<tr><td>Target .NET 4.0, while Lumen targets 4.7</td><td>A .NET 4.7 installer could not start on the machine it needs to warn. A 4.0 program runs on any 4.x runtime, so it can start and report what is missing.</td></tr>
+<tr><td>WinForms, not WPF</td><td>A small dialog needs nothing more, and it keeps the exe light.</td></tr>
+<tr><td>Install per user, to <code>%LOCALAPPDATA%\Programs\Lumen</code></td><td>Everything goes under the user's profile and <code>HKEY_CURRENT_USER</code>, so no administrator rights or UAC prompt are needed.</td></tr>
+<tr><td>Embed one resource per file</td><td>The folder structure survives in the resource names, no zip code is needed, and the exe stays a single file.</td></tr>
+<tr><td>Write an <code>install.manifest</code> file list</td><td>Uninstall deletes only the listed files, so it can never destroy something a user put in that folder.</td></tr>
+<tr><td>Share code with the viewer installer</td><td>The two installers differ only in a few names, which <code>Product.cs</code> holds. The Lumen project links the rest from <code>src\Lumen.Setup</code>.</td></tr>
+</table>
+
+<h3>What happens during a build</h3>
+<ol>
+<li>MSBuild starts <code>Lumen.DesktopSetup.csproj</code>.</li>
+<li>A custom target runs before compilation and builds <code>Lumen.Desktop</code>, whose project references bring in the engine, visuals and other libraries.</li>
+<li>That target collects everything in <code>src\Lumen.Desktop\bin\Release</code> except symbols, and adds each file as an embedded resource named <code>payload/&lt;relative path&gt;</code>.</li>
+<li>The C# compiler builds <code>LumenSetup.exe</code> with those resources inside.</li>
+</ol>
+<p>Lumen does not reference <code>Lumen.Viewer</code>, so the viewer can't reach the output folder. That is what keeps it out of this installer. <a href="#s10">Step 10</a> confirms it.</p>
+
+<h2 id="need">What you need</h2>
+<ul>
+<li>Visual Studio 2022 with the .NET desktop development workload. Use its <code>MSBuild.exe</code>, not <code>dotnet build</code>, as the rest of Lumen does.</li>
+<li>The Lumen source tree, here <code>E:\AAA\Claude\PowerClone\PRD</code>. Run the commands below in PowerShell from that folder.</li>
+<li>Network access on the first build, so that NuGet can restore packages. If the .NET 4.0 targeting pack isn't on the machine, restore also fetches its reference assemblies.</li>
+</ul>
+<p>Every command on this page uses this variable, so set it once in your PowerShell session:</p>
+<pre><code>$msbuild = 'C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe'</code></pre>
+
+<h2 id="s1">Step 1: Create the folders</h2>
+<p>You end up with this layout. Only <code>Lumen.DesktopSetup</code> belongs to this installer alone. The files in <code>Lumen.Setup</code> are the shared code.</p>
+<pre><code>PRD\
+  Directory.Build.props                    version number and defaults, already there
+  src\
+    Lumen.Setup\
+      app.manifest                         shared
+      Installer.cs                         shared
+      Program.cs                           shared
+      SetupForm.cs                         shared
+    Lumen.DesktopSetup\
+      Lumen.DesktopSetup.csproj            this installer's project
+      Product.cs                           this installer's names</code></pre>
+<pre><code>New-Item -ItemType Directory -Force src\Lumen.Setup, src\Lumen.DesktopSetup</code></pre>
+<p>In the full tree, <code>src\Lumen.Setup</code> also has a <code>Lumen.Setup.csproj</code> and a <code>Product.cs</code> for the viewer installer. This installer doesn't use them. Its project compiles only the three <code>.cs</code> files that it names.</p>
+
+<h2 id="s2">Step 2: Add the manifest</h2>
+<p>Save this as <code>src\Lumen.Setup\app.manifest</code>. Two settings matter:</p>
+<ul>
+<li><b><code>asInvoker</code></b> runs the program with the user's normal rights. Without it, Windows sees "Setup" in the file name and demands elevation. This is called installer detection.</li>
+<li><b><code>dpiAware</code></b> keeps text sharp on scaled displays. It also makes the program responsible for its own layout scaling, which <a href="#s6">Step 6</a> handles.</li>
+</ul>
+<pre data-file="src/Lumen.Setup/app.manifest"><code>&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1"&gt;
+  &lt;assemblyIdentity version="1.0.0.0" name="Lumen.Setup" /&gt;
+  &lt;!-- The install is per user. asInvoker also stops Windows from demanding elevation because "Setup" is in the file name. --&gt;
+  &lt;trustInfo xmlns="urn:schemas-microsoft-com:asm.v3"&gt;
+    &lt;security&gt;
+      &lt;requestedPrivileges&gt;
+        &lt;requestedExecutionLevel level="asInvoker" uiAccess="false" /&gt;
+      &lt;/requestedPrivileges&gt;
+    &lt;/security&gt;
+  &lt;/trustInfo&gt;
+  &lt;application xmlns="urn:schemas-microsoft-com:asm.v3"&gt;
+    &lt;windowsSettings&gt;
+      &lt;dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings"&gt;true&lt;/dpiAware&gt;
+    &lt;/windowsSettings&gt;
+  &lt;/application&gt;
+&lt;/assembly&gt;</code></pre>
+
+<h2 id="s3">Step 3: Describe the product</h2>
+<p>Save this as <code>src\Lumen.DesktopSetup\Product.cs</code>. The shared code reads every product-specific name from this class. These values are <code>const</code>, so the shared code can use them to build its own constants.</p>
+<p>The <code>ProgId</code> and <code>RegistryKey</code> must differ from the viewer's values. That is why the two products can be installed and removed independently.</p>
+<pre data-file="src/Lumen.DesktopSetup/Product.cs"><code>namespace Lumen.Setup
+{
+    /// &lt;summary&gt;What this installer installs. Each setup project has its own copy of this class and shares the rest of the code, so the two products register under different names and can sit side by side.&lt;/summary&gt;
+    internal static class Product
+    {
+        /// &lt;summary&gt;The name people see, and the install folder, shortcut and Settings entry.&lt;/summary&gt;
+        public const string Name = "Lumen";
+        /// &lt;summary&gt;The application's exe.&lt;/summary&gt;
+        public const string ExeName = "Lumen.exe";
+        /// &lt;summary&gt;The shortcut's tooltip.&lt;/summary&gt;
+        public const string Description = "Build and share Lumen reports";
+        /// &lt;summary&gt;The file type registration for .lumen files.&lt;/summary&gt;
+        public const string ProgId = "Lumen.Report";
+        /// &lt;summary&gt;The key under the Windows Uninstall list.&lt;/summary&gt;
+        public const string RegistryKey = "Lumen";
+    }
+}</code></pre>
+
+<h2 id="s4">Step 4: Write the install logic</h2>
+<p>Save this as <code>src\Lumen.Setup\Installer.cs</code>. It has three classes:</p>
+<table>
+<tr><th>Class</th><th>Job</th></tr>
+<tr><td><code>InstallOptions</code></td><td>Plain settings that the window and the command line both fill.</td></tr>
+<tr><td><code>DotNet</code></td><td>The prerequisite check.</td></tr>
+<tr><td><code>Installer</code></td><td>Copying, shortcuts, file association, the Settings entry, and uninstall.</td></tr>
+</table>
+<h3>The .NET check</h3>
+<p>.NET Framework 4.5 and later publish a <code>Release</code> DWORD under <code>HKLM\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full</code>. Compare it with <code>&gt;=</code>, because later versions have higher numbers. Microsoft documents 460798 as the lowest value for 4.7.</p>
+<p>The exe is AnyCPU, so it could run as a 32-bit process, and the code opens the 64-bit registry view explicitly. <code>Meets47</code> is a pure function of the number, which lets the <code>/assumerelease</code> switch test it on any machine.</p>
+<h3>Points worth reading in the code</h3>
+<ul>
+<li><b>Upgrade:</b> <code>Install</code> compares the old manifest with the new list and deletes files that the new version no longer ships.</li>
+<li><b>Failure:</b> a failed first install removes what it wrote. The <code>catch ... when (!upgrade)</code> filter leaves a failed upgrade in place, and running setup again repairs it.</li>
+<li><b>Self-delete:</b> a running exe can't delete itself, so <code>Uninstall</code> starts a hidden <code>cmd.exe</code> that waits about two seconds, then deletes <code>uninstall.exe</code> and removes the folder if it's empty.</li>
+<li><b>Shortcuts:</b> these go through the <code>WScript.Shell</code> COM object with <code>dynamic</code>, which is why the project references <code>Microsoft.CSharp</code>.</li>
+<li><b>File association:</b> <code>Associate</code> sets itself as the default only when <code>.lumen</code> has no owner. Otherwise it joins <code>OpenWithProgids</code>, so it never takes the default from another app.</li>
+</ul>
+<details><summary>Show Installer.cs</summary>
+<pre data-file="src/Lumen.Setup/Installer.cs"><code>using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Runtime.InteropServices;
+using Microsoft.Win32;
+
+namespace Lumen.Setup
+{
+    /// &lt;summary&gt;What a run of the installer should do. The form and the command line both fill one of these.&lt;/summary&gt;
+    internal sealed class InstallOptions
+    {
+        /// &lt;summary&gt;Install folder.&lt;/summary&gt;
+        public string Folder = Installer.DefaultFolder;
+        /// &lt;summary&gt;Add a desktop shortcut.&lt;/summary&gt;
+        public bool DesktopShortcut;
+        /// &lt;summary&gt;Make the application open .lumen files.&lt;/summary&gt;
+        public bool Associate = true;
+    }
+
+    /// &lt;summary&gt;The prerequisite check. .NET Framework 4.x reports its version as a number in the registry; Microsoft documents 460798 as the lowest value for 4.7.&lt;/summary&gt;
+    internal static class DotNet
+    {
+        /// &lt;summary&gt;The lowest Release value of .NET Framework 4.7.&lt;/summary&gt;
+        public const int Net47Release = 460798;
+        /// &lt;summary&gt;Where to get it. The installer opens this page; it never downloads anything itself.&lt;/summary&gt;
+        public const string DownloadUrl = "https://dotnet.microsoft.com/download/dotnet-framework/net47";
+
+        /// &lt;summary&gt;The installed Release value, or 0 if .NET 4.5 or later is absent. Reads the 64-bit view, which a 32-bit process would otherwise not see.&lt;/summary&gt;
+        public static int InstalledRelease()
+        {
+            var view = Environment.Is64BitOperatingSystem ? RegistryView.Registry64 : RegistryView.Registry32;
+            using (var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, view))
+            using (var key = hklm.OpenSubKey(@"SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full"))
+                return key?.GetValue("Release") is int release ? release : 0;
+        }
+
+        /// &lt;summary&gt;True when the machine can run the application. Pure, so that the self-test can drive it with any number.&lt;/summary&gt;
+        public static bool Meets47(int release) =&gt; release &gt;= Net47Release;
+    }
+
+    /// &lt;summary&gt;Copies the embedded application and registers it for the current user. Everything lands under the user's profile and HKEY_CURRENT_USER, so no administrator rights are needed.&lt;/summary&gt;
+    internal static class Installer
+    {
+        private const string AppName = Product.Name;
+        private const string ExeName = Product.ExeName;
+        private const string UninstallerName = "uninstall.exe";
+        // Lists the installed files, one relative path per line. The uninstaller deletes these and nothing else, so a folder the user chose is safe.
+        private const string ManifestName = "install.manifest";
+        private const string PayloadPrefix = "payload/";
+        private const string ProgId = Product.ProgId;
+        private const string UninstallKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\" + Product.RegistryKey;
+        private const string ClassesKey = @"Software\Classes\";
+
+        /// &lt;summary&gt;The usual place for a per-user application.&lt;/summary&gt;
+        public static string DefaultFolder =&gt; Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", AppName);
+
+        private static string StartMenuLink =&gt; Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), AppName + ".lnk");
+        private static string DesktopLink =&gt; Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), AppName + ".lnk");
+
+        /// &lt;summary&gt;The installer's version, which the build takes from Directory.Build.props.&lt;/summary&gt;
+        public static string Version =&gt; Assembly.GetExecutingAssembly().GetName().Version.ToString(3);
+
+        /// &lt;summary&gt;The embedded files.&lt;/summary&gt;
+        private static List&lt;string&gt; Payload() =&gt;
+            Assembly.GetExecutingAssembly().GetManifestResourceNames().Where(n =&gt; n.StartsWith(PayloadPrefix, StringComparison.Ordinal)).ToList();
+
+        /// &lt;summary&gt;True if the application started from this folder is running. Windows would refuse to overwrite or delete its files.&lt;/summary&gt;
+        public static bool AppRunning(string folder)
+        {
+            string exe = Path.Combine(folder, ExeName);
+            foreach (var p in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(ExeName)))
+            {
+                using (p)
+                {
+                    try { if (string.Equals(p.MainModule.FileName, exe, StringComparison.OrdinalIgnoreCase)) return true; }
+                    catch (Exception ex) when (ex is System.ComponentModel.Win32Exception || ex is InvalidOperationException) { }
+                }
+            }
+            return false;
+        }
+
+        /// &lt;summary&gt;Installs or upgrades. &lt;paramref name="progress"/&gt; gets a percentage. A failed first install removes what it wrote; a failed upgrade leaves a mix, and running setup again repairs it.&lt;/summary&gt;
+        public static void Install(InstallOptions o, Action&lt;int&gt; progress)
+        {
+            string folder = Path.GetFullPath(o.Folder);
+            string manifest = Path.Combine(folder, ManifestName);
+            bool upgrade = File.Exists(manifest);
+            var previous = upgrade ? File.ReadAllLines(manifest).ToList() : new List&lt;string&gt;();
+            var written = new List&lt;string&gt;();
+            var payload = Payload();
+            try
+            {
+                Directory.CreateDirectory(folder);
+                var assembly = Assembly.GetExecutingAssembly();
+                for (int i = 0; i &lt; payload.Count; i++)
+                {
+                    string relative = payload[i].Substring(PayloadPrefix.Length).Replace('/', Path.DirectorySeparatorChar);
+                    string target = Path.Combine(folder, relative);
+                    Directory.CreateDirectory(Path.GetDirectoryName(target));
+                    using (var from = assembly.GetManifestResourceStream(payload[i]))
+                    using (var to = new FileStream(target, FileMode.Create, FileAccess.Write))
+                        from.CopyTo(to);
+                    written.Add(relative);
+                    progress((i + 1) * 90 / payload.Count);
+                }
+                File.Copy(Assembly.GetExecutingAssembly().Location, Path.Combine(folder, UninstallerName), true);
+                written.Add(UninstallerName);
+                written.Add(ManifestName);
+                File.WriteAllLines(manifest, written);
+
+                // Files of an older version that this one no longer ships.
+                foreach (var stale in previous.Except(written, StringComparer.OrdinalIgnoreCase))
+                    DeleteFile(Path.Combine(folder, stale));
+
+                string exe = Path.Combine(folder, ExeName);
+                CreateShortcut(StartMenuLink, exe, folder);
+                if (o.DesktopShortcut) CreateShortcut(DesktopLink, exe, folder);
+                if (o.Associate) Associate(exe);
+                Register(folder, exe);
+                progress(100);
+            }
+            catch (Exception) when (!upgrade)
+            {
+                foreach (var f in written) DeleteFile(Path.Combine(folder, f));
+                RemoveEmptyFolders(folder, written);
+                throw;
+            }
+        }
+
+        /// &lt;summary&gt;Removes what &lt;see cref="Install"/&gt; added, running from the installed uninstall.exe. That exe cannot delete itself while it runs, so a hidden command finishes the job after it exits.&lt;/summary&gt;
+        public static void Uninstall(string folder)
+        {
+            var listed = File.ReadAllLines(Path.Combine(folder, ManifestName)).ToList();
+            DeleteFile(StartMenuLink);
+            DeleteFile(DesktopLink);
+            Unassociate();
+            Registry.CurrentUser.DeleteSubKeyTree(UninstallKey, false);
+            foreach (var f in listed.Where(x =&gt; !x.Equals(UninstallerName, StringComparison.OrdinalIgnoreCase)))
+                DeleteFile(Path.Combine(folder, f));
+            RemoveEmptyFolders(folder, listed);
+
+            string me = Path.Combine(folder, UninstallerName);
+            string command = "/c ping -n 3 127.0.0.1 &gt;nul &amp; del /f /q \"" + me + "\" &amp; rmdir \"" + folder + "\"";
+            Process.Start(new ProcessStartInfo("cmd.exe", command) { CreateNoWindow = true, UseShellExecute = false });
+        }
+
+        /// &lt;summary&gt;Starts the installed application.&lt;/summary&gt;
+        public static void Launch(string folder) =&gt; Process.Start(Path.Combine(folder, ExeName));
+
+        /// &lt;summary&gt;Deletes a file that may already be gone.&lt;/summary&gt;
+        private static void DeleteFile(string path)
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
+
+        /// &lt;summary&gt;Removes the subfolders of the listed files, deepest first, then the install folder, if each is empty. Never recursive: a file the user put there stays.&lt;/summary&gt;
+        private static void RemoveEmptyFolders(string folder, IEnumerable&lt;string&gt; files)
+        {
+            var folders = files.Select(Path.GetDirectoryName).Where(d =&gt; !string.IsNullOrEmpty(d)).Distinct().OrderByDescending(d =&gt; d.Length)
+                .Select(d =&gt; Path.Combine(folder, d)).Concat(new[] { folder });
+            foreach (var d in folders)
+                if (Directory.Exists(d) &amp;&amp; !Directory.EnumerateFileSystemEntries(d).Any()) Directory.Delete(d);
+        }
+
+        /// &lt;summary&gt;Makes a .lnk through the shell's scripting object, which is the one way to write one from managed code without a type library reference.&lt;/summary&gt;
+        private static void CreateShortcut(string link, string target, string folder)
+        {
+            dynamic shell = Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell"));
+            dynamic shortcut = shell.CreateShortcut(link);
+            shortcut.TargetPath = target;
+            shortcut.WorkingDirectory = folder;
+            shortcut.Description = Product.Description;
+            shortcut.Save();
+            Marshal.FinalReleaseComObject(shortcut);
+            Marshal.FinalReleaseComObject(shell);
+        }
+
+        /// &lt;summary&gt;Registers the file type. If something else already owns .lumen it stays the default, and this application joins Open with.&lt;/summary&gt;
+        private static void Associate(string exe)
+        {
+            var hkcu = Registry.CurrentUser;
+            using (var command = hkcu.CreateSubKey(ClassesKey + ProgId + @"\shell\open\command"))
+                command.SetValue("", "\"" + exe + "\" \"%1\"");
+            using (var type = hkcu.CreateSubKey(ClassesKey + ProgId))
+                type.SetValue("", "Lumen report");
+            using (var icon = hkcu.CreateSubKey(ClassesKey + ProgId + @"\DefaultIcon"))
+                icon.SetValue("", exe + ",0");
+            using (var ext = hkcu.CreateSubKey(ClassesKey + ".lumen"))
+            {
+                if (string.IsNullOrEmpty(ext.GetValue("") as string)) ext.SetValue("", ProgId);
+                using (var with = ext.CreateSubKey("OpenWithProgids")) with.SetValue(ProgId, "");
+            }
+            NotifyShell();
+        }
+
+        /// &lt;summary&gt;Undoes &lt;see cref="Associate"/&gt;, leaving anything another program registered.&lt;/summary&gt;
+        private static void Unassociate()
+        {
+            var hkcu = Registry.CurrentUser;
+            hkcu.DeleteSubKeyTree(ClassesKey + ProgId, false);
+            bool remove = false;
+            using (var ext = hkcu.OpenSubKey(ClassesKey + ".lumen", true))
+            {
+                if (ext != null)
+                {
+                    if (ext.GetValue("") as string == ProgId) ext.DeleteValue("");
+                    using (var with = ext.OpenSubKey("OpenWithProgids", true))
+                    {
+                        with?.DeleteValue(ProgId, false);
+                        if (with != null &amp;&amp; with.ValueCount == 0) ext.DeleteSubKey("OpenWithProgids");
+                    }
+                    remove = ext.ValueCount == 0 &amp;&amp; ext.SubKeyCount == 0;
+                }
+            }
+            if (remove) hkcu.DeleteSubKey(ClassesKey + ".lumen");
+            NotifyShell();
+        }
+
+        /// &lt;summary&gt;Adds the entry in Settings, Installed apps.&lt;/summary&gt;
+        private static void Register(string folder, string exe)
+        {
+            string uninstaller = "\"" + Path.Combine(folder, UninstallerName) + "\" /uninstall";
+            long kb = Directory.GetFiles(folder, "*", SearchOption.AllDirectories).Sum(f =&gt; new FileInfo(f).Length) / 1024;
+            using (var key = Registry.CurrentUser.CreateSubKey(UninstallKey))
+            {
+                key.SetValue("DisplayName", AppName);
+                key.SetValue("DisplayVersion", Version);
+                key.SetValue("Publisher", "Lumen");
+                key.SetValue("InstallLocation", folder);
+                key.SetValue("DisplayIcon", exe);
+                key.SetValue("UninstallString", uninstaller);
+                key.SetValue("QuietUninstallString", uninstaller + " /quiet");
+                key.SetValue("NoModify", 1, RegistryValueKind.DWord);
+                key.SetValue("NoRepair", 1, RegistryValueKind.DWord);
+                key.SetValue("EstimatedSize", (int)kb, RegistryValueKind.DWord);
+            }
+        }
+
+        /// &lt;summary&gt;Tells Explorer that file associations changed, so icons update without a restart.&lt;/summary&gt;
+        private static void NotifyShell() =&gt; SHChangeNotify(0x08000000, 0, IntPtr.Zero, IntPtr.Zero);
+
+        [DllImport("shell32.dll")] private static extern void SHChangeNotify(int eventId, uint flags, IntPtr item1, IntPtr item2);
+    }
+}</code></pre>
+</details>
+
+<h2 id="s5">Step 5: Write the entry point</h2>
+<p>Save this as <code>src\Lumen.Setup\Program.cs</code>. The same exe plays three parts, chosen by the command line:</p>
+<ul>
+<li>No arguments: it shows the setup window.</li>
+<li><code>/quiet</code>: it installs with no window and reports through the exit code.</li>
+<li><code>/uninstall</code>: it removes the app. <code>Install</code> copied the running exe to <code>uninstall.exe</code>, and Windows Settings calls it with this switch.</li>
+</ul>
+<details><summary>Show Program.cs</summary>
+<pre data-file="src/Lumen.Setup/Program.cs"><code>using System;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Windows.Forms;
+
+namespace Lumen.Setup
+{
+    /// &lt;summary&gt;Entry point. With no arguments it shows the setup window. Run as uninstall.exe with /uninstall it removes the application.
+    /// &lt;para&gt;Command line: &lt;c&gt;/quiet&lt;/c&gt; shows no window; &lt;c&gt;/dir=path&lt;/c&gt;, &lt;c&gt;/desktop&lt;/c&gt; and &lt;c&gt;/noassoc&lt;/c&gt; set the options;
+    /// &lt;c&gt;/assumerelease=n&lt;/c&gt; pretends the machine reports .NET Release n, to test the prerequisite check.&lt;/para&gt;
+    /// &lt;para&gt;Exit codes: 0 done, 1 failed, 2 .NET Framework 4.7 is missing, 3 the application is running.&lt;/para&gt;&lt;/summary&gt;
+    internal static class Program
+    {
+        private const int Failed = 1, MissingDotNet = 2, AppRunning = 3;
+
+        /// &lt;summary&gt;Routes the command line.&lt;/summary&gt;
+        [STAThread]
+        private static int Main(string[] args)
+        {
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            bool quiet = Has(args, "/quiet");
+            if (Has(args, "/uninstall")) return Uninstall(quiet);
+
+            string assumed = Value(args, "/assumerelease=");
+            int release = assumed != null ? int.Parse(assumed) : DotNet.InstalledRelease();
+            if (!Environment.Is64BitOperatingSystem)
+            {
+                if (!quiet) MessageBox.Show(Product.Name + " needs 64-bit Windows.", Product.Name + " Setup", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return Failed;
+            }
+
+            var options = new InstallOptions
+            {
+                Folder = Value(args, "/dir=") ?? Installer.DefaultFolder,
+                DesktopShortcut = Has(args, "/desktop"),
+                Associate = !Has(args, "/noassoc")
+            };
+            if (!quiet)
+            {
+                Application.Run(new SetupForm(options, release));
+                return 0;
+            }
+
+            if (!DotNet.Meets47(release)) return MissingDotNet;
+            if (Installer.AppRunning(Path.GetFullPath(options.Folder))) return AppRunning;
+            try { Installer.Install(options, p =&gt; { }); return 0; }
+            catch (Exception ex) when (IsExpected(ex)) { Console.Error.WriteLine(ex.Message); return Failed; }
+        }
+
+        /// &lt;summary&gt;Removes the application in the folder this exe runs from.&lt;/summary&gt;
+        private static int Uninstall(bool quiet)
+        {
+            string folder = Path.GetDirectoryName(Process.GetCurrentProcess().MainModule.FileName);
+            if (Installer.AppRunning(folder))
+            {
+                if (!quiet) MessageBox.Show("Close " + Product.Name + ", then uninstall again.", Product.Name, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return AppRunning;
+            }
+            if (!quiet &amp;&amp; MessageBox.Show("Remove " + Product.Name + "? Your reports are not touched.", Product.Name, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return 0;
+            try { Installer.Uninstall(folder); return 0; }
+            catch (Exception ex) when (IsExpected(ex))
+            {
+                if (!quiet) MessageBox.Show("Could not remove everything: " + ex.Message, Product.Name, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return Failed;
+            }
+        }
+
+        /// &lt;summary&gt;The failures a full disk, a locked file or a bad path can cause.&lt;/summary&gt;
+        internal static bool IsExpected(Exception ex) =&gt; ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is NotSupportedException;
+
+        private static bool Has(string[] args, string flag) =&gt; args.Any(a =&gt; a.Equals(flag, StringComparison.OrdinalIgnoreCase));
+
+        private static string Value(string[] args, string prefix) =&gt;
+            args.Where(a =&gt; a.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).Select(a =&gt; a.Substring(prefix.Length)).FirstOrDefault();
+    }
+}</code></pre>
+</details>
+
+<h2 id="s6">Step 6: Write the setup window</h2>
+<p>Save this as <code>src\Lumen.Setup\SetupForm.cs</code>. The UI is built in code, with no designer file, as in the rest of Lumen. Three details matter:</p>
+<ul>
+<li><b>Missing .NET:</b> the input controls are disabled and the main button becomes <b>Get .NET 4.7</b>, which opens Microsoft's page. The installer never downloads anything itself.</li>
+<li><b>Threading:</b> installing runs on a worker thread so that the progress bar moves, and it returns to the UI thread through <code>BeginInvoke</code>. <code>FormClosing</code> refuses to close while <code>_busy</code> is set.</li>
+<li><b>Display scaling:</b> the layout is in 96 dpi pixels, while fonts in points grow with the display. The last line of the constructor calls <code>Scale</code> with the real dpi. Leave <code>AutoScaleMode</code> at <code>None</code>: with <code>Dpi</code>, this window grew but its controls didn't, and the .NET message was cut off at 125%.</li>
+</ul>
+<details><summary>Show SetupForm.cs</summary>
+<pre data-file="src/Lumen.Setup/SetupForm.cs"><code>using System;
+using System.Diagnostics;
+using System.Drawing;
+using System.IO;
+using System.Threading;
+using System.Windows.Forms;
+
+namespace Lumen.Setup
+{
+    /// &lt;summary&gt;The one setup window: folder, options, prerequisite status and progress. With .NET 4.7 missing, Install is replaced by a link to Microsoft's download page.&lt;/summary&gt;
+    internal sealed class SetupForm : Form
+    {
+        private readonly InstallOptions _options;
+        private readonly bool _dotNetOk;
+        private readonly TextBox _folder = new TextBox { Left = 16, Top = 72, Width = 372 };
+        private readonly Button _browse = new Button { Text = "Browse...", Left = 396, Top = 70, Width = 84, Height = 26 };
+        private readonly CheckBox _associate = new CheckBox { Text = "Open .lumen files with " + Product.Name, Left = 16, Top = 108, Width = 460 };
+        private readonly CheckBox _desktop = new CheckBox { Text = "Add a desktop shortcut", Left = 16, Top = 134, Width = 460 };
+        private readonly CheckBox _launch = new CheckBox { Text = "Start " + Product.Name + " now", Left = 16, Top = 134, Width = 460, Checked = true, Visible = false };
+        private readonly Label _status = new Label { Left = 16, Top = 168, Width = 464, Height = 36 };
+        private readonly ProgressBar _bar = new ProgressBar { Left = 16, Top = 208, Width = 464, Height = 16 };
+        private readonly Button _action = new Button { Left = 300, Top = 238, Width = 88, Height = 28 };
+        private readonly Button _close = new Button { Text = "Cancel", Left = 392, Top = 238, Width = 88, Height = 28 };
+        private bool _finished, _busy;
+
+        /// &lt;summary&gt;Builds the window. &lt;paramref name="release"/&gt; is the .NET Release value found on the machine.&lt;/summary&gt;
+        public SetupForm(InstallOptions options, int release)
+        {
+            _options = options;
+            _dotNetOk = DotNet.Meets47(release);
+            Text = Product.Name + " " + Installer.Version + " Setup";
+            ClientSize = new Size(496, 280);
+            FormBorderStyle = FormBorderStyle.FixedDialog;
+            MaximizeBox = false;
+            StartPosition = FormStartPosition.CenterScreen;
+            AutoScaleMode = AutoScaleMode.None;
+            Font = new Font("Segoe UI", 9f);
+
+            Controls.Add(new Label { Text = Product.Name, Left = 16, Top = 12, Width = 464, Height = 28, Font = new Font("Segoe UI", 14f, FontStyle.Bold) });
+            Controls.Add(new Label { Text = "Install to this folder. No administrator rights are needed.", Left = 16, Top = 48, Width = 464 });
+            _folder.Text = options.Folder;
+            _associate.Checked = options.Associate;
+            _desktop.Checked = options.DesktopShortcut;
+            Controls.AddRange(new Control[] { _folder, _browse, _associate, _desktop, _launch, _status, _bar, _action, _close });
+
+            _status.Text = _dotNetOk ? ".NET Framework 4.7 or later is installed."
+                : Product.Name + " needs .NET Framework 4.7 or later, and this PC does not have it. Install it from Microsoft, restart if asked, then run this setup again.";
+            _status.ForeColor = _dotNetOk ? SystemColors.ControlText : Color.Firebrick;
+            _action.Text = _dotNetOk ? "Install" : "Get .NET 4.7";
+            _folder.Enabled = _browse.Enabled = _associate.Enabled = _desktop.Enabled = _dotNetOk;
+
+            _browse.Click += (s, e) =&gt; Browse();
+            _action.Click += (s, e) =&gt; { if (_dotNetOk) Run(); else Process.Start(DotNet.DownloadUrl); };
+            _close.Click += (s, e) =&gt; Close();
+            FormClosing += (s, e) =&gt; { e.Cancel = _busy; };
+            FormClosed += (s, e) =&gt; { if (_finished &amp;&amp; _launch.Checked) Installer.Launch(_options.Folder); };
+            AcceptButton = _action;
+            ActiveControl = _action;
+            // The layout above is in 96 dpi pixels, while fonts in points already follow the display.
+            using (var g = CreateGraphics()) Scale(new SizeF(g.DpiX / 96f, g.DpiY / 96f));
+        }
+
+        /// &lt;summary&gt;Picks the install folder.&lt;/summary&gt;
+        private void Browse()
+        {
+            using (var dlg = new FolderBrowserDialog { SelectedPath = _folder.Text })
+                if (dlg.ShowDialog(this) == DialogResult.OK) _folder.Text = dlg.SelectedPath;
+        }
+
+        /// &lt;summary&gt;Installs on a worker thread, so that the window stays live and the bar moves.&lt;/summary&gt;
+        private void Run()
+        {
+            _options.Folder = _folder.Text.Trim();
+            _options.Associate = _associate.Checked;
+            _options.DesktopShortcut = _desktop.Checked;
+            string folder;
+            try { folder = Path.GetFullPath(_options.Folder); }
+            catch (Exception ex) when (Program.IsExpected(ex)) { Report("That folder is not valid: " + ex.Message); return; }
+            if (Installer.AppRunning(folder)) { Report("Close " + Product.Name + ", then press Install again."); return; }
+
+            _busy = true;
+            _action.Enabled = _close.Enabled = _folder.Enabled = _browse.Enabled = _associate.Enabled = _desktop.Enabled = false;
+            _status.ForeColor = SystemColors.ControlText;
+            _status.Text = "Installing...";
+            new Thread(() =&gt;
+            {
+                try
+                {
+                    Installer.Install(_options, p =&gt; BeginInvoke(new Action(() =&gt; _bar.Value = p)));
+                    BeginInvoke(new Action(Finished));
+                }
+                catch (Exception ex) when (Program.IsExpected(ex))
+                {
+                    BeginInvoke(new Action(() =&gt;
+                    {
+                        _busy = false;
+                        _action.Enabled = _close.Enabled = _folder.Enabled = _browse.Enabled = _associate.Enabled = _desktop.Enabled = true;
+                        Report("Setup could not finish: " + ex.Message);
+                    }));
+                }
+            }) { IsBackground = false }.Start();
+        }
+
+        /// &lt;summary&gt;Shows a problem in the status line.&lt;/summary&gt;
+        private void Report(string text)
+        {
+            _status.ForeColor = Color.Firebrick;
+            _status.Text = text;
+        }
+
+        /// &lt;summary&gt;Turns the window into its last page.&lt;/summary&gt;
+        private void Finished()
+        {
+            _busy = false;
+            _finished = true;
+            _status.Text = Product.Name + " is installed. Find it on the Start menu.";
+            _desktop.Visible = false;
+            _launch.Visible = true;
+            _action.Visible = false;
+            _close.Text = "Finish";
+            _close.Enabled = true;
+            AcceptButton = _close;
+        }
+    }
+}</code></pre>
+</details>
+
+<h2 id="s7">Step 7: Write the project file</h2>
+<p>Save this as <code>src\Lumen.DesktopSetup\Lumen.DesktopSetup.csproj</code>. This file is what makes the installer. An installer written for another app would change little else.</p>
+<pre data-file="src/Lumen.DesktopSetup/Lumen.DesktopSetup.csproj"><code>&lt;Project Sdk="Microsoft.NET.Sdk"&gt;
+  &lt;!-- The installer for the Lumen builder. It compiles the code of Lumen.Setup with its own Product.cs, and embeds Lumen.Desktop instead of the viewer. It targets .NET 4.0 for the same reason: to start without 4.7 and say what is missing. --&gt;
+  &lt;PropertyGroup&gt;
+    &lt;TargetFramework&gt;net40&lt;/TargetFramework&gt;
+    &lt;OutputType&gt;WinExe&lt;/OutputType&gt;
+    &lt;AssemblyName&gt;LumenSetup&lt;/AssemblyName&gt;
+    &lt;RootNamespace&gt;Lumen.Setup&lt;/RootNamespace&gt;
+    &lt;PlatformTarget&gt;AnyCPU&lt;/PlatformTarget&gt;
+    &lt;ApplicationManifest&gt;..\Lumen.Setup\app.manifest&lt;/ApplicationManifest&gt;
+    &lt;StartupObject&gt;Lumen.Setup.Program&lt;/StartupObject&gt;
+    &lt;EnableDefaultEmbeddedResourceItems&gt;false&lt;/EnableDefaultEmbeddedResourceItems&gt;
+  &lt;/PropertyGroup&gt;
+  &lt;ItemGroup&gt;
+    &lt;Reference Include="System.Windows.Forms" /&gt;
+    &lt;Reference Include="System.Drawing" /&gt;
+    &lt;Reference Include="Microsoft.CSharp" /&gt;
+    &lt;Compile Include="..\Lumen.Setup\Installer.cs" Link="Installer.cs" /&gt;
+    &lt;Compile Include="..\Lumen.Setup\Program.cs" Link="Program.cs" /&gt;
+    &lt;Compile Include="..\Lumen.Setup\SetupForm.cs" Link="SetupForm.cs" /&gt;
+  &lt;/ItemGroup&gt;
+
+  &lt;!-- Restores and builds Lumen, then embeds its output as one resource per file, named payload/&lt;relative path&gt;. Symbols stay out.
+       The restore has its own property so that MSBuild evaluates the project afresh for the build, with the restored packages. --&gt;
+  &lt;Target Name="EmbedApp" BeforeTargets="BeforeBuild"&gt;
+    &lt;MSBuild Projects="..\Lumen.Desktop\Lumen.Desktop.csproj" Targets="Restore" Properties="Configuration=$(Configuration);MSBuildRestoreSessionId=$([System.Guid]::NewGuid())" /&gt;
+    &lt;MSBuild Projects="..\Lumen.Desktop\Lumen.Desktop.csproj" Properties="Configuration=$(Configuration)" /&gt;
+    &lt;PropertyGroup&gt;
+      &lt;AppOut&gt;..\Lumen.Desktop\bin\$(Configuration)\&lt;/AppOut&gt;
+    &lt;/PropertyGroup&gt;
+    &lt;ItemGroup&gt;
+      &lt;AppFile Include="$(AppOut)**\*" Exclude="$(AppOut)**\*.pdb" /&gt;
+      &lt;EmbeddedResource Include="@(AppFile)" LogicalName="payload/%(RecursiveDir)%(Filename)%(Extension)" Type="Non-Resx" WithCulture="false" /&gt;
+    &lt;/ItemGroup&gt;
+  &lt;/Target&gt;
+&lt;/Project&gt;</code></pre>
+<table>
+<tr><th>Setting</th><th>Why</th></tr>
+<tr><td><code>TargetFramework</code> and <code>PlatformTarget</code></td><td>These override <code>net47</code> and <code>x64</code> from <code>Directory.Build.props</code>. The project file wins because it's evaluated after that file.</td></tr>
+<tr><td><code>AssemblyName</code></td><td>This names the output <code>LumenSetup.exe</code>.</td></tr>
+<tr><td><code>RootNamespace</code></td><td>The shared code lives in namespace <code>Lumen.Setup</code>, so <code>Product.cs</code> uses it too.</td></tr>
+<tr><td><code>EnableDefaultEmbeddedResourceItems</code></td><td>This stops the SDK from adding its own resources, so the only ones are those the target adds.</td></tr>
+<tr><td><code>&lt;Compile Include ... Link&gt;</code></td><td>These compile the shared files in place, without copying them. <code>Product.cs</code> needs no entry, because the SDK picks up <code>.cs</code> files in the project's own folder.</td></tr>
+<tr><td><code>BeforeTargets="BeforeBuild"</code></td><td>The target must run before compilation, so that the resources are there for the compiler.</td></tr>
+<tr><td><code>&lt;MSBuild Projects=...&gt;</code></td><td>These are build calls, not a <code>ProjectReference</code>. A reference to a net47 project from a net40 one would be rejected, and it would also copy Lumen's files beside the installer.</td></tr>
+<tr><td><code>Targets="Restore"</code> and <code>MSBuildRestoreSessionId</code></td><td>The <code>-restore</code> switch restores only this project, so a fresh checkout has no packages for Lumen and fails with <code>NETSDK1004</code>. The first call restores Lumen. Its extra property, set to a new GUID, forces MSBuild to evaluate Lumen again for the second call, so that the build sees the restored packages.</td></tr>
+<tr><td>Items inside the target</td><td>A wildcard outside a target is evaluated when the project loads, before Lumen's output exists. Inside the target, it's evaluated after Lumen has been built.</td></tr>
+<tr><td><code>LogicalName</code></td><td><code>%(RecursiveDir)</code> keeps subfolders such as <code>de\</code> in the name, as <code>payload/de\PdfSharp-wpf.resources.dll</code>. <code>Installer.Install</code> turns the name back into a path.</td></tr>
+<tr><td><code>Type="Non-Resx"</code>, <code>WithCulture="false"</code></td><td>Without these, MSBuild treats a file such as <code>de\*.resources.dll</code> as a culture-specific resource and handles it differently.</td></tr>
+</table>
+
+<h2 id="s8">Step 8: Add it to the solution</h2>
+<p>This makes the installer build with the solution. In Visual Studio, right-click the solution and choose Add, then Existing Project. From the command line:</p>
+<pre><code>dotnet sln Lumen.sln add src\Lumen.DesktopSetup\Lumen.DesktopSetup.csproj</code></pre>
+<p>The project already builds Lumen itself, so don't add a project reference.</p>
+
+<h2 id="s9">Step 9: Build</h2>
+<div class="warn"><p>Close every running copy of Lumen first. An open Lumen window locks <code>src\Lumen.Desktop\bin\Release</code>, and the build fails.</p></div>
+<p>To set the version, change <code>&lt;Version&gt;</code> in <code>Directory.Build.props</code>. Setup shows it in its title bar and in Windows Settings. Then build:</p>
+<pre><code>&amp; $msbuild src\Lumen.DesktopSetup\Lumen.DesktopSetup.csproj -restore -p:Configuration=Release -v:m -nologo</code></pre>
+<p>The last line of output should read:</p>
+<pre><code>Lumen.DesktopSetup -&gt; ...\src\Lumen.DesktopSetup\bin\Release\LumenSetup.exe</code></pre>
+<p>The exe is about 2.6 MB. Building the whole solution also produces it.</p>
+
+<h2 id="s10">Step 10: Confirm the contents</h2>
+<p>List the embedded files, and confirm that Lumen is there and the viewer isn't. Run this in its own PowerShell session or close it afterward, because a loaded exe stays locked until the session ends:</p>
+<pre><code>$exe = (Resolve-Path src\Lumen.DesktopSetup\bin\Release\LumenSetup.exe).Path
+$names = [Reflection.Assembly]::LoadFile($exe).GetManifestResourceNames() | Where-Object { $_ -like 'payload/*' }
+$names
+"Files: $($names.Count)"
+"Lumen.exe: " + [bool]($names -match '^payload/Lumen\.exe$')
+"Viewer files: " + @($names -match 'Viewer').Count
+"Symbols: " + @($names -match '\.pdb$').Count</code></pre>
+<p>You should see 15 files, <code>Lumen.exe: True</code>, <code>Viewer files: 0</code> and <code>Symbols: 0</code>. The file count can change if Lumen's dependencies change.</p>
+
+<h2 id="s11">Step 11: Test it</h2>
+<p>These tests install to a temporary folder. The <code>/noassoc</code> switch leaves your <code>.lumen</code> settings alone. The Start menu link and Settings entry are real, and the uninstall test removes them.</p>
+<pre><code>$setup = (Resolve-Path src\Lumen.DesktopSetup\bin\Release\LumenSetup.exe).Path
+$dir = "$env:TEMP\LumenInstallTest"
+function Run($exe, $arguments) { (Start-Process $exe -ArgumentList $arguments -PassThru -Wait).ExitCode }</code></pre>
+<h3>The .NET check blocks an old machine</h3>
+<p>394802 is the Release value of .NET 4.6.2. Expect exit code 2, and the second line should be <code>False</code>:</p>
+<pre><code>Run $setup @('/quiet', "`"/dir=$dir`"", '/noassoc', '/assumerelease=394802')
+Test-Path $dir</code></pre>
+<h3>The lowest allowed version installs</h3>
+<p>Expect 0, then <code>True</code>:</p>
+<pre><code>Run $setup @('/quiet', "`"/dir=$dir`"", '/noassoc', '/assumerelease=460798')
+Test-Path "$dir\Lumen.exe"</code></pre>
+<h3>The installed app works</h3>
+<p>Lumen's self-check drives the real shell and writes PNGs and a log beside the path you give it. Expect exit code 0. If the PC has been idle for 30 seconds, it also moves the real mouse for a few seconds.</p>
+<pre><code>$out = "$env:TEMP\LumenInstallCheck"
+New-Item -ItemType Directory -Force $out | Out-Null
+Run "$dir\Lumen.exe" @('--screenshot', "`"$out\out.png`"")</code></pre>
+<h3>A running copy blocks changes</h3>
+<p>Expect 3 from both commands:</p>
+<pre><code>$lumen = Start-Process "$dir\Lumen.exe" -PassThru
+Start-Sleep 5
+Run $setup @('/quiet', "`"/dir=$dir`"", '/noassoc')
+Run "$dir\uninstall.exe" @('/uninstall', '/quiet')
+Stop-Process -Id $lumen.Id</code></pre>
+<h3>Uninstall keeps your files</h3>
+<p>Add a file of your own, then uninstall. Expect 0, then <code>my-notes.txt</code> as the only thing left. Wait a few seconds first, because <code>uninstall.exe</code> deletes itself just after it exits.</p>
+<pre><code>Set-Content "$dir\my-notes.txt" 'keep me'
+Run "$dir\uninstall.exe" @('/uninstall', '/quiet')
+Start-Sleep 5
+Get-ChildItem $dir | ForEach-Object Name
+Test-Path "$([Environment]::GetFolderPath('Programs'))\Lumen.lnk"
+Remove-Item $dir -Recurse -Force</code></pre>
+<p>The <code>Test-Path</code> line should print <code>False</code>, which shows that the Start menu link is gone.</p>
+<h3>The setup window</h3>
+<p>Run these and look at each window. The first should show the red message and <b>Get .NET 4.7</b>. The second should show <b>Install</b>.</p>
+<pre><code>Start-Process $setup -ArgumentList '/noassoc', '/assumerelease=394802'
+Start-Process $setup -ArgumentList '/noassoc'</code></pre>
+<p>If you can, repeat this at a display scale other than 100%. A window can be correct at one scale and clipped at another.</p>
+
+<h2 id="s12">Step 12: Distribute it</h2>
+<p>Give people <code>LumenSetup.exe</code>. It's the only file they need.</p>
+<h3>Command line</h3>
+<table>
+<tr><th>Switch</th><th>Effect</th></tr>
+<tr><td><code>/quiet</code></td><td>No window.</td></tr>
+<tr><td><code>/dir=path</code></td><td>Install folder.</td></tr>
+<tr><td><code>/desktop</code></td><td>Add a desktop shortcut.</td></tr>
+<tr><td><code>/noassoc</code></td><td>Leave <code>.lumen</code> files alone.</td></tr>
+<tr><td><code>/assumerelease=n</code></td><td>Pretend .NET reports Release n. For testing.</td></tr>
+</table>
+<table>
+<tr><th>Exit code</th><th>Meaning</th></tr>
+<tr><td>0</td><td>Done.</td></tr>
+<tr><td>1</td><td>Failed.</td></tr>
+<tr><td>2</td><td>.NET Framework 4.7 is missing.</td></tr>
+<tr><td>3</td><td>Lumen is running from the target folder.</td></tr>
+</table>
+<h3>Before sharing it outside your own use</h3>
+<ul>
+<li><b>Code signing:</b> the exe is unsigned, so SmartScreen warns on first run. A code signing certificate removes the "unknown publisher" warning. Sign it with <code>signtool</code> after the build, then again test that it runs.</li>
+<li><b>Real older machine:</b> the steps above simulate an old .NET. Also try the installer on a real machine.</li>
+<li><b>No .NET 4.x at all:</b> the check can't run on such a machine, because the installer itself needs 4.0. Windows shows its own prompt instead. Windows 10 and 11 always include .NET 4.x.</li>
+<li><b>Third-party licenses:</b> the install doesn't include license texts for AvalonEdit, PDFsharp, ExcelDataReader or Newtonsoft.Json. Check each package's terms and add the texts to Lumen's output, and they'll be embedded automatically.</li>
+<li><b>Install folder:</b> keep Lumen and Lumen Viewer in separate folders. The defaults already are. Setup doesn't stop someone from choosing the same one, and each would overwrite the other's <code>uninstall.exe</code> and file list.</li>
+</ul>
+<p>Uninstalling leaves Lumen's autosave folder, <code>%LOCALAPPDATA%\Lumen</code>, on purpose. It holds the user's recovery data, not program files.</p>
+
+<h2 id="trouble">Troubleshooting</h2>
+<table>
+<tr><th>Symptom</th><th>Cause and fix</th></tr>
+<tr><td>Build error <code>MSB3027</code> or <code>MSB3021</code>, unable to copy <code>Lumen.exe</code></td><td>A Lumen window is open, or a PowerShell session loaded a file from that folder. Close it and build again.</td></tr>
+<tr><td>Build error <code>MSB3027</code> on <code>LumenSetup.exe</code> after Step 10</td><td>The PowerShell session that ran <code>LoadFile</code> holds the exe. Close that session.</td></tr>
+<tr><td><code>NETSDK1004</code>, <code>project.assets.json</code> not found</td><td>Lumen's packages weren't restored. Check that the target has the <code>Targets="Restore"</code> call from Step 7.</td></tr>
+<tr><td><code>CS0246</code> for <code>Product</code></td><td><code>Product.cs</code> isn't in the project's folder, or its namespace isn't <code>Lumen.Setup</code>.</td></tr>
+<tr><td><code>Reference assemblies for .NETFramework,Version=v4.0 were not found</code></td><td>Add <code>-restore</code> to the build so that NuGet can fetch them, or install the 4.0 targeting pack.</td></tr>
+<tr><td>A UAC prompt appears when setup starts</td><td>The manifest isn't in the exe. Check that <code>ApplicationManifest</code> points to <code>..\Lumen.Setup\app.manifest</code>.</td></tr>
+<tr><td>Setup installs an old Lumen</td><td>Lumen's output was stale or a file was left in <code>bin\Release</code>. Delete <code>src\Lumen.Desktop\bin\Release</code> and build again.</td></tr>
+<tr><td>Text is cut off in the setup window</td><td>Check that the <code>Scale</code> call is still the last line of the constructor, and that <code>AutoScaleMode</code> is <code>None</code>.</td></tr>
+<tr><td>Double-clicking a <code>.lumen</code> file opens the wrong copy</td><td>Setup keeps an existing default. Use Open with, then Always, or change it in Settings under Default apps.</td></tr>
+<tr><td><code>/quiet</code> shows nothing, even on failure</td><td>That's by design. Read the exit code, as the <code>Run</code> function does.</td></tr>
+</table>
+
+<footer>Lumen installer guide. Source: <code>src\Lumen.DesktopSetup</code> and <code>src\Lumen.Setup</code>.</footer>
+</main>
+</div>
+</body>
+</html>

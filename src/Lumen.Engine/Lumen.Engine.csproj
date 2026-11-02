@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\Lumen.Model\Lumen.Model.csproj" />
+  </ItemGroup>
+</Project>
